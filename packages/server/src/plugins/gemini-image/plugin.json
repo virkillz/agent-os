@@ -1,0 +1,13 @@
+{
+  "id": "gemini-image",
+  "displayName": "Gemini Image",
+  "description": "Image generation via Google Gemini Imagen API",
+  "env": [
+    {
+      "key": "GEMINI_API_KEY",
+      "required": true,
+      "description": "API key from Google AI Studio (aistudio.google.com)"
+    }
+  ],
+  "toolIds": ["gemini_generate_image"]
+}

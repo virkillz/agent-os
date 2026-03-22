@@ -1,0 +1,13 @@
+{
+  "id": "elevenlabs",
+  "displayName": "ElevenLabs",
+  "description": "Text-to-speech audio generation via ElevenLabs API",
+  "env": [
+    {
+      "key": "ELEVENLABS_API_KEY",
+      "required": true,
+      "description": "API key from elevenlabs.io → Profile → API Keys"
+    }
+  ],
+  "toolIds": ["elevenlabs_tts"]
+}

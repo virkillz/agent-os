@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Game UI — semi-transparent panels over background */
+    --s0: 8 18 36;           /* fallback bg tint */
+    --s1: 12 24 48;          /* sidebar/panel — used with opacity */
+    --s2: 16 32 60;          /* card/input surface */
+    --s3: 24 44 80;          /* elevated/hover */
+    --border: rgba(255,255,255,0.10);
+    --accent: 245 158 11;    /* amber-500 */
+    --muted: #7a9ec0;
+    --subtle: #a8c8e8;
+    --text-primary: #e8f2ff;
+
+    --status-green: #4ade80;
+    --status-green-bg: rgba(34, 197, 94, 0.12);
+    --status-green-border: rgba(34, 197, 94, 0.25);
+
+    --status-amber: #fbbf24;
+    --status-amber-bg: rgba(245, 158, 11, 0.12);
+    --status-amber-border: rgba(245, 158, 11, 0.25);
+
+    --status-blue: #60a5fa;
+    --status-blue-bg: rgba(96, 165, 250, 0.12);
+    --status-blue-border: rgba(96, 165, 250, 0.25);
+
+    --status-red: #f87171;
+    --status-red-bg: rgba(239, 68, 68, 0.12);
+    --status-red-border: rgba(239, 68, 68, 0.25);
+
+    --status-gray: #94a3b8;
+    --status-gray-bg: rgba(100, 116, 139, 0.12);
+    --status-gray-border: rgba(100, 116, 139, 0.2);
+  }
+
+  html, body {
+    @apply antialiased;
+    color: var(--text-primary);
+    height: 100%;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    background-color: rgb(var(--s0));
+    background-image: url('/background.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+  }
+
+  #root {
+    height: 100%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded px-3 py-2 text-sm
+           focus:outline-none transition-colors;
+    background: rgba(8, 18, 40, 0.60);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-primary);
+  }
+  .input:focus { border-color: rgba(245,158,11,0.5); box-shadow: 0 0 0 2px rgba(245,158,11,0.12); }
+  .input::placeholder { color: var(--muted); }
+
+  .btn-primary {
+    @apply font-semibold px-4 py-2 rounded text-sm transition-all
+           disabled:opacity-40 disabled:cursor-not-allowed active:scale-95;
+    background: rgb(var(--accent));
+    color: #0a0f1a;
+  }
+  .btn-primary:hover:not(:disabled) { background: #d97706; }
+
+  .btn-ghost {
+    @apply px-3 py-2 rounded text-sm transition-colors;
+    color: var(--subtle);
+  }
+  .btn-ghost:hover { background: rgb(var(--s3)); color: var(--text-primary); }
+
+  .card {
+    background: rgba(10, 20, 45, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.10);
+    @apply rounded-lg;
+  }
+
+  /* Glass panel — used for sidebar, HUD, main panels */
+  .glass {
+    background: rgba(8, 18, 40, 0.80);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-color: rgba(255,255,255,0.10);
+  }
+
+  /* Status badges */
+  .badge {
+    @apply text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1;
+  }
+  .badge-active  { background: var(--status-green-bg);  color: var(--status-green);  border: 1px solid var(--status-green-border); }
+  .badge-working { background: var(--status-amber-bg);  color: var(--status-amber);  border: 1px solid var(--status-amber-border); }
+  .badge-meeting { background: var(--status-blue-bg);   color: var(--status-blue);   border: 1px solid var(--status-blue-border); }
+  .badge-error   { background: var(--status-red-bg);    color: var(--status-red);    border: 1px solid var(--status-red-border); }
+  .badge-offline { background: var(--status-gray-bg);   color: var(--status-gray);   border: 1px solid var(--status-gray-border); }
+
+  /* Priority tags */
+  .priority { @apply text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide; }
+  .priority-high   { background: var(--status-red-bg);   color: var(--status-red);   }
+  .priority-medium { background: var(--status-amber-bg); color: var(--status-amber); }
+  .priority-low    { background: var(--status-blue-bg);  color: var(--status-blue);  }
+
+  /* HUD stat block */
+  .hud-stat {
+    @apply flex items-center gap-2.5 px-4;
+  }
+  .hud-stat-label {
+    @apply text-[10px] uppercase tracking-widest font-medium;
+    color: var(--muted);
+  }
+  .hud-stat-value {
+    @apply text-sm font-bold;
+    color: var(--text-primary);
+  }
+
+  /* Game nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-all;
+    color: var(--subtle);
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover {
+    background: rgb(var(--s3) / 0.6);
+    color: var(--text-primary);
+  }
+  .nav-item.active {
+    background: rgba(245, 158, 11, 0.08);
+    color: var(--text-primary);
+    border-left-color: rgb(var(--accent));
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.animate-pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in { animation: slide-in-right 0.25s ease-out forwards; }
+
+@keyframes zoom-in {
+  from { transform: scale(0.93); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.animate-zoom-in { animation: zoom-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) forwards; }

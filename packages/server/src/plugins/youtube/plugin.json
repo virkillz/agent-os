@@ -1,0 +1,18 @@
+{
+  "id": "youtube",
+  "displayName": "YouTube",
+  "description": "Search YouTube videos and upload to a channel via YouTube Data API v3",
+  "env": [
+    {
+      "key": "YOUTUBE_API_KEY",
+      "required": true,
+      "description": "API key from Google Cloud Console with YouTube Data API v3 enabled (for search)"
+    },
+    {
+      "key": "YOUTUBE_OAUTH_TOKEN",
+      "required": false,
+      "description": "OAuth2 access token for upload operations (obtain via google-auth-library or gcloud CLI)"
+    }
+  ],
+  "toolIds": ["youtube_search", "youtube_upload"]
+}

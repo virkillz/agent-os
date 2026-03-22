@@ -1,0 +1,7 @@
+{
+  "id": "remotion",
+  "displayName": "Remotion",
+  "description": "Video rendering engine — compiles React compositions to MP4 using Remotion",
+  "env": [],
+  "toolIds": ["remotion_render", "remotion_preview"]
+}

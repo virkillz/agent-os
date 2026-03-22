@@ -1,0 +1,39 @@
+{
+  "name": "@rascal-inc/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "rascal": "./bin/rascal.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts start --dir ../../",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "latest",
+    "@mariozechner/pi-coding-agent": "latest",
+    "@mozilla/readability": "^0.6.0",
+    "@types/cookie-parser": "^1.4.10",
+    "chalk": "^5.3.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "cron-parser": "^5.5.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsdom": "^29.0.1",
+    "multer": "^2.1.1",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsdom": "^28.0.1",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
