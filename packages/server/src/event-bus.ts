@@ -26,6 +26,8 @@ export type AppEvent =
   | { type: 'chat:message'; agentId: string; agentName: string; role: 'assistant'; content: string; messageId: number }
   // ── Notification events ───────────────────────────────────────────────────────
   | { type: 'notification:created'; notification: NotificationRow }
+  // ── Provider account events ───────────────────────────────────────────────────
+  | { type: 'provider_account:cooldown'; accountId: string; provider: string; cooldownMinutes: number }
 
 type Handler = (event: AppEvent) => void
 

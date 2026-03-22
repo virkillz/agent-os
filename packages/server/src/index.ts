@@ -12,6 +12,7 @@ import { pluginLoader } from './plugin-loader.js'
 import { platformToolLoader } from './platform-tools/loader.js'
 import { startServer } from './server.js'
 import { startScheduler } from './scheduler.js'
+import { clearExpiredCooldowns } from './account-pool.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -95,6 +96,7 @@ async function cmdStart() {
   // Run setup for plugins that are already configured (e.g. on restart)
   await pluginLoader.runSetupForConfigured()
 
+  clearExpiredCooldowns()
   startScheduler()
 
   // Resolve web dist — look relative to this file in production

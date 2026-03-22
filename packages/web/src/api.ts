@@ -287,6 +287,18 @@ export const api = {
     removeMember: (channelId: string, agentId: string) =>
       req<{ ok: boolean }>('DELETE', `/channels/${channelId}/members/${agentId}`),
   },
+
+  // ─── Provider Accounts ────────────────────────────────────────────────────
+
+  providerAccounts: {
+    list: () => req<ProviderAccount[]>('GET', '/provider-accounts'),
+    create: (data: { providerId: string; label: string; apiKey: string }) =>
+      req<ProviderAccount>('POST', '/provider-accounts', data),
+    update: (id: string, data: { label?: string; apiKey?: string; isActive?: boolean }) =>
+      req<ProviderAccount>('PUT', `/provider-accounts/${id}`, data),
+    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/provider-accounts/${id}`),
+    clearCooldown: (id: string) => req<{ ok: boolean }>('POST', `/provider-accounts/${id}/clear-cooldown`),
+  },
 }
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
@@ -317,7 +329,7 @@ export interface Agent {
   description: string
   system_prompt: string
   model_config: string
-  modelConfig: { provider?: string; modelId?: string; thinkingLevel?: string; allowedSkills?: string[]; tools?: string[]; disabledTools?: string[] }
+  modelConfig: { provider?: string; modelId?: string; thinkingLevel?: string; allowedSkills?: string[]; tools?: string[]; disabledTools?: string[]; accountId?: string }
   source: string
   avatar_color: string
   avatar_url: string
@@ -332,9 +344,20 @@ export interface CreateAgentInput {
   role: string
   description?: string
   systemPrompt?: string
-  modelConfig?: { provider?: string; modelId?: string; thinkingLevel?: string }
+  modelConfig?: { provider?: string; modelId?: string; thinkingLevel?: string; accountId?: string }
   avatarUrl?: string
   avatarColor?: string
+}
+
+export interface ProviderAccount {
+  id: string
+  providerId: string
+  label: string
+  maskedKey: string
+  isActive: boolean
+  cooldownUntil: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface ChatMessage {

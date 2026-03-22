@@ -16,6 +16,7 @@ import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
 import { pluginLoader } from './plugin-loader.js'
+import { pickAccount, markCooldown, getCooldownMinutes } from './account-pool.js'
 
 let debugMode = false
 
@@ -40,6 +41,7 @@ export interface ModelConfig {
   tools?: string[]
   disabledTools?: string[]
   allowedSkills?: string[]
+  accountId?: string
 }
 
 export interface AgentRecord {
@@ -55,6 +57,7 @@ export interface AgentRecord {
 interface LiveSession {
   session: Awaited<ReturnType<typeof createAgentSession>>['session']
   unsubscribe: (() => void) | null
+  accountId: string | null
 }
 
 // One persistent session per agent, keyed by agent ID.
@@ -255,19 +258,29 @@ async function createLiveSession(
   })
   await loader.reload()
 
+  // Resolve provider account — prefer agent's accountId, fall back to env-var auth
+  const account = pickAccount(config.provider, config.accountId)
+  const authStorage = AuthStorage.inMemory()
+  if (account) {
+    authStorage.setRuntimeApiKey(config.provider, account.api_key)
+    if (debugMode) dbg(agent.name, chalk.dim(`auth: account "${account.label}" (${account.id})`))
+  } else if (debugMode) {
+    dbg(agent.name, chalk.dim('auth: falling back to env var'))
+  }
+
   const { session } = await createAgentSession({
     cwd: workspaceDir,
     model,
     thinkingLevel: (config.thinkingLevel ?? 'low') as 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh',
-    authStorage: AuthStorage.create(),
-    modelRegistry: new ModelRegistry(AuthStorage.create()),
+    authStorage,
+    modelRegistry: new ModelRegistry(authStorage),
     resourceLoader: loader,
     tools: createCodingTools(workspaceDir),
     customTools,
     sessionManager: SessionManager.create(dataDir, sessionsDir),
   })
 
-  const liveSession: LiveSession = { session, unsubscribe: null }
+  const liveSession: LiveSession = { session, unsubscribe: null, accountId: account?.id ?? null }
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     const p = pending.get(agent.id)
@@ -316,6 +329,25 @@ async function createLiveSession(
         case 'auto_retry_end':
           dbg(agent.name, chalk.red('↺ retry_end'), event.success ? chalk.green('success') : chalk.red('failed'), event.finalError ?? '')
           break
+      }
+    }
+
+    // 429 / rate-limit detection: put account on cooldown and kill session
+    if (event.type === 'auto_retry_start' && liveSession.accountId) {
+      const is429 = /429|rate.?limit|too.?many.?request/i.test(event.errorMessage)
+      if (is429) {
+        const mins = getCooldownMinutes()
+        markCooldown(liveSession.accountId, mins)
+        eventBus.emit({
+          type: 'provider_account:cooldown',
+          accountId: liveSession.accountId,
+          provider: config.provider,
+          cooldownMinutes: mins,
+        })
+        console.log(`[agent-runner] Account ${liveSession.accountId} (${config.provider}) on cooldown for ${mins}m — 429 received`)
+        // Drop session so next chatWithAgent call picks a fresh account
+        liveSessions.delete(agent.id)
+        if (liveSession.unsubscribe) liveSession.unsubscribe()
       }
     }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store.ts'
-import { type Agent } from '../../api.ts'
+import { api, type Agent, type ProviderAccount } from '../../api.ts'
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   openrouter: [
@@ -48,6 +48,8 @@ export function ModelSection({
   const [thinkingLevel, setThinkingLevel] = useState(
     agent.modelConfig?.thinkingLevel ?? settings?.defaultModel?.thinkingLevel ?? 'low'
   )
+  const [accountId, setAccountId] = useState(agent.modelConfig?.accountId ?? '')
+  const [accounts, setAccounts] = useState<ProviderAccount[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [open, setOpen] = useState(false)
@@ -56,8 +58,14 @@ export function ModelSection({
     loadProviders()
   }, [loadProviders])
 
+  useEffect(() => {
+    if (!useCustom) return
+    api.providerAccounts.list().then(setAccounts).catch(() => setAccounts([]))
+  }, [useCustom])
+
   function handleProviderChange(p: string) {
     setProvider(p)
+    setAccountId('')
     const suggestions = PROVIDER_MODELS[p]
     if (suggestions?.length) setModelId(suggestions[0])
   }
@@ -65,7 +73,9 @@ export function ModelSection({
   async function handleSave() {
     setSaving(true)
     try {
-      const modelConfig = useCustom ? { provider, modelId, thinkingLevel } : undefined
+      const modelConfig = useCustom
+        ? { provider, modelId, thinkingLevel, ...(accountId ? { accountId } : {}) }
+        : undefined
       await onSave({ modelConfig: modelConfig as any })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -186,6 +196,28 @@ export function ModelSection({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-subtle mb-1.5">Account</label>
+                <select
+                  className="input"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                >
+                  <option value="">Auto (any available)</option>
+                  {accounts
+                    .filter((a) => a.providerId === provider)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.label}
+                        {a.cooldownUntil ? ' (on cooldown)' : ''}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                  Pin this agent to a specific API key. Manage keys in Settings → Accounts.
+                </p>
               </div>
             </div>
           )}

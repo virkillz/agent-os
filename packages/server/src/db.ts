@@ -220,6 +220,21 @@ function runMigrations(db: DB): void {
       PRIMARY KEY (notification_id, user_id)
     );
 
+    -- ── Provider Accounts ────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS provider_accounts (
+      id             TEXT PRIMARY KEY,
+      provider_id    TEXT NOT NULL,
+      label          TEXT NOT NULL,
+      api_key        TEXT NOT NULL,
+      is_active      INTEGER NOT NULL DEFAULT 1,
+      cooldown_until TEXT,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_provider_accounts_provider
+      ON provider_accounts(provider_id, is_active);
+
     -- ── Auth sessions ────────────────────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -267,6 +282,7 @@ function runMigrations(db: DB): void {
   addColumnIfNotExists(db, 'cards', 'is_archived', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfNotExists(db, 'lanes', 'lane_type', "TEXT NOT NULL DEFAULT 'in_progress'")
   addColumnIfNotExists(db, 'lanes', 'description', "TEXT NOT NULL DEFAULT ''")
+  addColumnIfNotExists(db, 'agents', 'account_id', 'TEXT')
 
   // Assign lane types to existing boards that have none set yet.
   // For each board where all lanes are still 'in_progress' (i.e. fresh migration),
@@ -532,6 +548,17 @@ export interface ChannelMessageRow {
   created_at: string
 }
 
+export interface ProviderAccountRow {
+  id: string
+  provider_id: string
+  label: string
+  api_key: string
+  is_active: number
+  cooldown_until: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface PluginRow {
   id: string
   display_name: string
@@ -615,4 +642,30 @@ export function getRecentChannelMessages(channelId: string, limit = 50): Channel
   return getDb()
     .prepare('SELECT * FROM channel_messages WHERE channel_id = ? ORDER BY created_at DESC LIMIT ?')
     .all(channelId, limit) as unknown as ChannelMessageRow[]
+}
+
+// ── Provider account helpers ──────────────────────────────────────────────────
+
+export function getAvailableAccountsForProvider(providerId: string): ProviderAccountRow[] {
+  const now = new Date().toISOString()
+  return getDb()
+    .prepare(
+      `SELECT * FROM provider_accounts
+       WHERE provider_id = ? AND is_active = 1
+         AND (cooldown_until IS NULL OR cooldown_until <= ?)
+       ORDER BY created_at ASC`
+    )
+    .all(providerId, now) as unknown as ProviderAccountRow[]
+}
+
+export function setAccountCooldown(accountId: string, untilIso: string): void {
+  getDb()
+    .prepare("UPDATE provider_accounts SET cooldown_until = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(untilIso, accountId)
+}
+
+export function clearAccountCooldown(accountId: string): void {
+  getDb()
+    .prepare("UPDATE provider_accounts SET cooldown_until = NULL, updated_at = datetime('now') WHERE id = ?")
+    .run(accountId)
 }

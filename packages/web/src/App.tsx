@@ -10,6 +10,7 @@ import AgentChat from './pages/AgentChat.tsx'
 import AgentSettings from './pages/AgentSettings.tsx'
 import Settings from './pages/Settings.tsx'
 import SettingsProvider from './pages/settings/Provider.tsx'
+import SettingsProviderAccounts from './pages/settings/ProviderAccounts.tsx'
 import SettingsModel from './pages/settings/Model.tsx'
 import SettingsExtensions from './pages/settings/Extensions.tsx'
 import SettingsSkills from './pages/settings/Skills.tsx'
@@ -126,6 +127,7 @@ export default function App() {
               <Route index element={<Navigate to="/settings/company" replace />} />
               <Route path="company" element={<SettingsCompany />} />
               <Route path="provider" element={<SettingsProvider />} />
+              <Route path="accounts" element={<SettingsProviderAccounts />} />
               <Route path="model" element={<SettingsModel />} />
               <Route path="extensions" element={<SettingsExtensions />} />
               <Route path="skills" element={<SettingsSkills />} />

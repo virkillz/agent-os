@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { to: '/settings/company', label: 'Company' },
   { to: '/settings/prompt', label: 'Prompt' },
   { to: '/settings/provider', label: 'Provider' },
+  { to: '/settings/accounts', label: 'Accounts' },
   { to: '/settings/model', label: 'Model' },
   { to: '/settings/skills', label: 'Skills' },
   { to: '/settings/roles', label: 'Roles' },

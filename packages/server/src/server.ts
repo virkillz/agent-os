@@ -21,6 +21,7 @@ import { createChannelsRouter } from './api/channels.js'
 import { createSkillsRouter } from './api/skills.js'
 import { createPlatformToolsRouter } from './api/platform-tools.js'
 import { createNotificationsRouter } from './api/notifications.js'
+import { createProviderAccountsRouter } from './api/provider-accounts.js'
 import { createNotification } from './notification-service.js'
 import { getDb } from './db.js'
 
@@ -59,6 +60,7 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
   app.use('/api/boards', createBoardsRouter())
   app.use('/api/channels', createChannelsRouter())
   app.use('/api/notifications', createNotificationsRouter())
+  app.use('/api/provider-accounts', createProviderAccountsRouter())
 
   // Health check
   app.get('/api/health', (_req, res) => res.json({ ok: true }))
