@@ -72,14 +72,42 @@ export default function Login({ onLogin }: LoginProps) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
-        <div className="card p-8 space-y-6">
+        <div
+          className="rounded-xl p-8 space-y-6 relative overflow-hidden"
+          style={{
+            background: 'rgba(10, 22, 45, 0.85)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(100, 210, 230, 0.1)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.4), 0 0 60px rgba(80, 200, 220, 0.04)',
+          }}
+        >
+          {/* Top glow line */}
+          <div
+            className="absolute top-0 left-0 right-0 h-[1.5px]"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.4), transparent)' }}
+          />
+
           {/* Logo + Brand */}
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2">
-              <img src="/logo.png" alt="Rascal Inc" className="w-24 h-24 rounded-lg object-cover" />
+            <div className="flex items-center justify-center">
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{ border: '1px solid rgba(100, 210, 230, 0.15)' }}
+              >
+                <img src="/logo.png" alt="Logo" className="w-24 h-24 object-cover" />
+              </div>
             </div>
-            <div className="text-white font-semibold text-lg mt-3">Rascal-Inc</div>
-            <p className="text-muted text-sm mt-1">
+            <div
+              className="font-bold text-lg mt-4 tracking-[0.15em] uppercase"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Robot Magang
+            </div>
+            <p
+              className="text-xs mt-2 leading-relaxed"
+              style={{ color: 'rgba(130, 160, 185, 0.55)' }}
+            >
               {message}
             </p>
           </div>
@@ -87,7 +115,12 @@ export default function Login({ onLogin }: LoginProps) {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-subtle mb-1.5">Username</label>
+              <label
+                className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]"
+                style={{ color: 'rgba(140, 200, 220, 0.6)' }}
+              >
+                Username
+              </label>
               <input
                 type="text"
                 value={username}
@@ -100,7 +133,12 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-subtle mb-1.5">Password</label>
+              <label
+                className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]"
+                style={{ color: 'rgba(140, 200, 220, 0.6)' }}
+              >
+                Password
+              </label>
               <input
                 type="password"
                 value={password}
@@ -112,17 +150,27 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
 
             {error && (
-              <p className="text-xs text-red-400">{error}</p>
+              <p className="text-xs" style={{ color: 'var(--status-red)' }}>{error}</p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full"
+              className="btn-primary w-full tracking-[0.15em] uppercase text-xs font-bold"
             >
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          {/* Bottom status line */}
+          <div className="text-center pt-2">
+            <span
+              className="text-[10px] tracking-[0.15em] uppercase"
+              style={{ color: 'rgba(130, 160, 185, 0.3)' }}
+            >
+              Secure Authentication
+            </span>
+          </div>
         </div>
       </div>
     </div>

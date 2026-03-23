@@ -105,7 +105,7 @@ export default function AgentChat() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full items-center justify-center py-4 px-4 md:px-8">
       {showDetail && <AgentDetailModal agent={agent} onClose={() => setShowDetail(false)} />}
       {activeModal && id && (
         <div
@@ -138,7 +138,28 @@ export default function AgentChat() {
           </div>
         </div>
       )}
-      <div className="flex-1 flex flex-col min-w-0">
+
+      {/* Cyberpunk window frame */}
+      <div
+        className="relative w-full flex flex-col"
+        style={{
+          maxWidth: '860px',
+          height: '100%',
+          background: 'rgba(6, 14, 32, 0.82)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(80, 180, 220, 0.18)',
+          borderRadius: '12px',
+          boxShadow: '0 0 0 1px rgba(80, 180, 220, 0.06), 0 8px 48px rgba(0,0,0,0.5), 0 0 60px rgba(40,120,200,0.06)',
+        }}
+      >
+        {/* Corner brackets */}
+        <span style={{ position: 'absolute', top: -1, left: -1, width: 16, height: 16, borderTop: '2px solid rgba(80,200,240,0.7)', borderLeft: '2px solid rgba(80,200,240,0.7)', borderRadius: '4px 0 0 0', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', top: -1, right: -1, width: 16, height: 16, borderTop: '2px solid rgba(80,200,240,0.7)', borderRight: '2px solid rgba(80,200,240,0.7)', borderRadius: '0 4px 0 0', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', bottom: -1, left: -1, width: 16, height: 16, borderBottom: '2px solid rgba(80,200,240,0.7)', borderLeft: '2px solid rgba(80,200,240,0.7)', borderRadius: '0 0 0 4px', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', bottom: -1, right: -1, width: 16, height: 16, borderBottom: '2px solid rgba(80,200,240,0.7)', borderRight: '2px solid rgba(80,200,240,0.7)', borderRadius: '0 0 4px 0', pointerEvents: 'none' }} />
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ borderRadius: '12px' }}>
         {/* Header */}
         <div
           className="flex items-center gap-3 px-6 py-4"
@@ -354,6 +375,7 @@ export default function AgentChat() {
             Enter to send · Shift+Enter for new line
           </p>
         </div>
+      </div>
       </div>
     </div>
   )
