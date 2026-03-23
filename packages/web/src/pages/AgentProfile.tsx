@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
-import { MessageCircle, Brain, CheckSquare, Calendar, Settings, ArrowLeft, type LucideIcon } from 'lucide-react'
+import { MessageCircle, Brain, CheckSquare, Calendar, Settings, type LucideIcon } from 'lucide-react'
+import PageHeader from '../components/PageHeader.tsx'
 
 export default function AgentProfile() {
   const { id } = useParams<{ id: string }>()
@@ -73,43 +74,11 @@ export default function AgentProfile() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 py-8 mt-20">
         
-        {/* ── Back Button ── */}
-        <button
-          onClick={() => navigate('/roster')}
-          className="group flex items-center justify-center w-12 h-12 rounded-xl mb-6 transition-all duration-300"
-          style={{
-            background: 'rgba(12, 30, 50, 0.5)',
-            border: '1px solid rgba(100, 210, 230, 0.12)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(20, 60, 80, 0.6)'
-            e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.4)'
-            e.currentTarget.style.transform = 'translateX(-2px)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(12, 30, 50, 0.5)'
-            e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.12)'
-            e.currentTarget.style.transform = 'translateX(0)'
-          }}
-        >
-          <ArrowLeft
-            size={24}
-            style={{ color: 'rgba(140, 200, 235, 0.8)' }}
-          />
-        </button>
-
-        {/* ── Page Title ── */}
-        <div className="mb-6">
-          <h1
-            className="text-lg font-bold tracking-[0.15em] uppercase"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            Agent Profile
-          </h1>
-          <p className="text-xs mt-1.5 tracking-wider uppercase" style={{ color: 'rgba(130, 160, 185, 0.5)' }}>
-            View and manage agent details
-          </p>
-        </div>
+        <PageHeader
+          title="Agent Profile"
+          subtitle="View and manage agent details"
+          backTo="/roster"
+        />
 
         {/* ── Agent Profile Card ── */}
         <div

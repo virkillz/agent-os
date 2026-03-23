@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import PageHeader from '../components/PageHeader.tsx'
 
 const NAV_ITEMS = [
   { to: '/settings/company', label: 'Company' },
@@ -6,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/settings/provider', label: 'Provider' },
   { to: '/settings/accounts', label: 'Accounts' },
   { to: '/settings/model', label: 'Model' },
+  { to: '/settings/extensions', label: 'Extensions' },
   { to: '/settings/skills', label: 'Skills' },
   { to: '/settings/roles', label: 'Roles' },
   { to: '/settings/appearance', label: 'Appearance' },
@@ -13,7 +15,20 @@ const NAV_ITEMS = [
 
 export default function Settings() {
   return (
-    <div className="flex h-full items-center justify-center py-4 px-4 md:px-8">
+    <div className="h-full flex flex-col">
+      {/* ── Header Section ── */}
+      <div className="flex-shrink-0">
+        <div className="max-w-4xl mx-auto px-6 pt-8 pb-4">
+          <PageHeader
+            title="Settings"
+            subtitle="Configure system preferences"
+            backTo="/dashboard"
+          />
+        </div>
+      </div>
+
+      {/* ── Settings Window Section ── */}
+      <div className="flex-1 flex items-center justify-center px-4 md:px-8 pb-4">
       {/* Cyberpunk window frame */}
       <div
         className="relative w-full flex"
@@ -74,6 +89,7 @@ export default function Settings() {
       <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
+      </div>
       </div>
     </div>
   )

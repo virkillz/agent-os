@@ -9,6 +9,9 @@ import Roster from './pages/Roster.tsx'
 import AgentProfile from './pages/AgentProfile.tsx'
 import AgentChat from './pages/AgentChat.tsx'
 import AgentSettings from './pages/AgentSettings.tsx'
+import AgentMemory from './pages/AgentMemory.tsx'
+import AgentTodos from './pages/AgentTodos.tsx'
+import AgentSchedule from './pages/AgentSchedule.tsx'
 import Settings from './pages/Settings.tsx'
 import SettingsProvider from './pages/settings/Provider.tsx'
 import SettingsProviderAccounts from './pages/settings/ProviderAccounts.tsx'
@@ -23,6 +26,7 @@ import Workspace from './pages/Workspace.tsx'
 import Board from './pages/Board.tsx'
 import Channels from './pages/Channels.tsx'
 import Dashboard from './pages/Dashboard.tsx'
+import Users from './pages/Users.tsx'
 import Notifications from './pages/Notifications.tsx'
 import Layout from './components/Layout.tsx'
 
@@ -120,9 +124,13 @@ export default function App() {
             <Route path="/channels/:id" element={<Channels />} />
             <Route path="/board" element={<Board />} />
             <Route path="/roster" element={<Roster />} />
+            <Route path="/users" element={<Users />} />
             <Route path="/agents/:id" element={<AgentProfile />} />
             <Route path="/agents/:id/chat" element={<AgentChat />} />
             <Route path="/agents/:id/settings" element={<AgentSettings />} />
+            <Route path="/agents/:id/memory" element={<AgentMemory />} />
+            <Route path="/agents/:id/todos" element={<AgentTodos />} />
+            <Route path="/agents/:id/schedule" element={<AgentSchedule />} />
             <Route path="/workspace" element={<Workspace />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />}>

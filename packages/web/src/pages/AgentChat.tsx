@@ -7,7 +7,7 @@ import { useAppEvents } from '../hooks/useAppEvents.ts'
 import { MemorySection } from '../components/agent-settings/MemorySection.tsx'
 import { TodosSection } from '../components/agent-settings/TodosSection.tsx'
 import { ScheduleSection } from '../components/agent-settings/ScheduleSection.tsx'
-import { ArrowLeft } from 'lucide-react'
+import PageHeader from '../components/PageHeader.tsx'
 
 export default function AgentChat() {
   const { id } = useParams<{ id: string }>()
@@ -110,43 +110,11 @@ export default function AgentChat() {
       {/* ── Header Section ── */}
       <div className="flex-shrink-0">
         <div className="max-w-4xl mx-auto px-6 pt-8 pb-4">
-          {/* ── Back Button ── */}
-          <button
-            onClick={() => navigate(`/agents/${id}`)}
-            className="group flex items-center justify-center w-12 h-12 rounded-xl mb-4 transition-all duration-300"
-            style={{
-              background: 'rgba(12, 30, 50, 0.5)',
-              border: '1px solid rgba(100, 210, 230, 0.12)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(20, 60, 80, 0.6)'
-              e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.4)'
-              e.currentTarget.style.transform = 'translateX(-2px)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(12, 30, 50, 0.5)'
-              e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.12)'
-              e.currentTarget.style.transform = 'translateX(0)'
-            }}
-          >
-            <ArrowLeft
-              size={24}
-              style={{ color: 'rgba(140, 200, 235, 0.8)' }}
-            />
-          </button>
-
-          {/* ── Page Title ── */}
-          <div className="mb-4">
-            <h1
-              className="text-lg font-bold tracking-[0.15em] uppercase"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              Chat
-            </h1>
-            <p className="text-xs mt-1.5 tracking-wider uppercase" style={{ color: 'rgba(130, 160, 185, 0.5)' }}>
-              {agent.name} • {agent.role}
-            </p>
-          </div>
+          <PageHeader
+            title="Chat"
+            subtitle={`${agent.name} • ${agent.role}`}
+            backTo={`/agents/${id}`}
+          />
         </div>
       </div>
 

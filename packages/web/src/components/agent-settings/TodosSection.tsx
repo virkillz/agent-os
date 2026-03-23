@@ -122,8 +122,8 @@ export function TodosSection({ agentId }: { agentId: string }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto flex items-start justify-center py-8 px-6">
-      <div className="w-full max-w-xl bg-gray-900/90 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl shadow-black/50 p-6 animate-zoom-in" onClick={(e) => e.stopPropagation()}>
+    <div className="flex-1 overflow-y-auto flex items-start justify-center py-8">
+      <div className="w-full max-w-4xl bg-gray-900/90 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl shadow-black/50 p-6 animate-zoom-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex gap-2 mb-6">
           <input
             className="input flex-1 text-sm"

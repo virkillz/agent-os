@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
 import AgentDetailModal from '../components/AgentDetailModal.tsx'
-import { ChevronLeftIcon } from '../components/agent-settings/icons.tsx'
+import PageHeader from '../components/PageHeader.tsx'
 import { ProfileSection } from '../components/agent-settings/ProfileSection.tsx'
 import { AvatarSection } from '../components/agent-settings/AvatarSection.tsx'
 import { ModelSection } from '../components/agent-settings/ModelSection.tsx'
@@ -53,7 +53,20 @@ export default function AgentSettings() {
   }
 
   return (
-    <div className="flex h-full items-center justify-center py-4 px-4 md:px-8">
+    <div className="h-full flex flex-col">
+      {/* ── Header Section ── */}
+      <div className="flex-shrink-0">
+        <div className="max-w-4xl mx-auto pt-8 pb-4">
+          <PageHeader
+            title="Agent Settings"
+            subtitle={`${agent.name} • ${agent.role}`}
+            backTo={`/agents/${id}`}
+          />
+        </div>
+      </div>
+
+      {/* ── Settings Window Section ── */}
+      <div className="flex-1 flex items-center justify-center px-4 md:px-8 pb-4">
       {showDetail && <AgentDetailModal agent={agent} onClose={() => setShowDetail(false)} />}
 
       {/* Cyberpunk window frame */}
@@ -87,15 +100,8 @@ export default function AgentSettings() {
           borderRight: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        {/* Back + agent header */}
+        {/* Agent header */}
         <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <button
-            className="flex items-center gap-1.5 text-xs text-muted hover:text-subtle mb-4 transition-colors"
-            onClick={() => navigate(`/agents/${id}`)}
-          >
-            <ChevronLeftIcon />
-            Back to chat
-          </button>
           <div className="flex items-center gap-2.5 mb-3">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden cursor-pointer"
@@ -194,6 +200,7 @@ export default function AgentSettings() {
         {section === 'prompt' && id && <PromptSection agentId={id} />}
         {section === 'sessions' && id && <SessionsSection agentId={id} />}
         {section === 'terminate' && id && <TerminateSection agent={agent} agentId={id} />}
+      </div>
       </div>
       </div>
     </div>
