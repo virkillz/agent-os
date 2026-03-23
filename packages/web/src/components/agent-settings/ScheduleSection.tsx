@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store.ts'
 import { api, type Schedule } from '../../api.ts'
+import { useAppEvents } from '../../hooks/useAppEvents.ts'
 import { BoltIcon, EyeIcon, PauseIcon, PencilIcon, PlayIcon, TrashIcon, VerticalEllipsisIcon, XIcon } from './icons.tsx'
 
 const CRON_PRESETS = [
@@ -50,6 +51,13 @@ export function ScheduleSection({ agentId }: { agentId: string }) {
   useEffect(() => {
     loadSchedules(agentId)
   }, [agentId, loadSchedules])
+
+  // Auto-refresh when agent creates a schedule via tool
+  useAppEvents((event) => {
+    if (event.type === 'schedule:created' && event.agentId === agentId) {
+      loadSchedules(agentId)
+    }
+  })
 
   useEffect(() => {
     if (openMenuId === null) return

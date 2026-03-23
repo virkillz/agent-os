@@ -1,21 +1,12 @@
 import { CronExpressionParser } from 'cron-parser'
 import chalk from 'chalk'
-import { getDb, getSetting, type ScheduleRow } from './db.js'
-import { runScheduledTask, isDebugMode, type AgentRecord, type ModelConfig } from './agent-runner.js'
+import { getDb, type ScheduleRow } from './db.js'
+import { isDebugMode, type AgentRecord } from './agent-runner.js'
 import { eventBus } from './event-bus.js'
+import { enqueueInvocation } from './queue-worker.js'
 
 function computeNextRun(cron: string): string {
   return CronExpressionParser.parse(cron).next().toDate().toISOString()
-}
-
-function getDefaultModel(): ModelConfig {
-  const stored = getSetting('default_model')
-  if (stored) {
-    try {
-      return JSON.parse(stored) as ModelConfig
-    } catch { /* fall through */ }
-  }
-  return { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.5', thinkingLevel: 'low' }
 }
 
 export function buildSchedulerPrompt(schedule: ScheduleRow): string {
@@ -62,6 +53,11 @@ export function startScheduler(): void {
 
       eventBus.emit({ type: 'schedule:fired', agentId: s.agent_id, scheduleId: s.id, label: s.label })
 
+      // Look up the trigger row for this schedule
+      const triggerRow = db.prepare(
+        "SELECT id FROM agent_triggers WHERE agent_id = ? AND type = 'scheduler' AND source_id = ?"
+      ).get(s.agent_id, String(s.id)) as { id: string } | undefined
+
       const triggerMsg = buildSchedulerPrompt(s)
 
       if (isDebugMode()) {
@@ -70,8 +66,13 @@ export function startScheduler(): void {
         console.log(chalk.cyan(`[debug][scheduler]`), chalk.dim('prompt:\n') + triggerMsg)
       }
 
-      runScheduledTask(agent, triggerMsg, getDefaultModel())
-        .catch(console.error)
+      enqueueInvocation({
+        agentId: s.agent_id,
+        triggerId: triggerRow?.id ?? null,
+        triggerType: 'scheduler',
+        prompt: triggerMsg,
+      })
     }
   }, 60_000)
 }
+

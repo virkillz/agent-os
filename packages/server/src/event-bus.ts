@@ -2,7 +2,7 @@ import type { MemoryRow, NotificationRow, TodoRow } from './db.js'
 
 export type AppEvent =
   | { type: 'connected' }
-  // ── Agent events ─────────────────────────────────────────────────────────────
+  // Agent events
   | { type: 'agent:created'; agentId: string }
   | { type: 'agent:thinking'; agentId: string }
   | { type: 'agent:reply'; agentId: string; preview: string }
@@ -16,18 +16,29 @@ export type AppEvent =
   | { type: 'schedule:fired'; agentId: string; scheduleId: number; label: string }
   | { type: 'schedule:created'; agentId: string; scheduleId: number; label: string }
   | { type: 'workspace:change'; path: string; action: 'created' | 'updated' | 'deleted' }
-  // ── Plugin events ─────────────────────────────────────────────────────────────
+  // Plugin events
   | { type: 'plugin:configured'; pluginId: string }
-  // ── Board events ──────────────────────────────────────────────────────────────
+  // Board events
   | { type: 'board:card_moved'; cardId: string; boardId: string; laneId: string; title: string }
-  // ── Channel events ────────────────────────────────────────────────────────────
+  // Channel events
   | { type: 'channel:message'; channelId: string; senderId: string; senderType: string; senderName: string; content: string; messageId: number }
-  // ── Chat events ───────────────────────────────────────────────────────────────
+  // Chat events
   | { type: 'chat:message'; agentId: string; agentName: string; role: 'assistant'; content: string; messageId: number }
-  // ── Notification events ───────────────────────────────────────────────────────
+  // Notification events
   | { type: 'notification:created'; notification: NotificationRow }
-  // ── Provider account events ───────────────────────────────────────────────────
+  // Provider account events
   | { type: 'provider_account:cooldown'; accountId: string; provider: string; cooldownMinutes: number }
+  // Invocation queue events
+  | { type: 'invocation:queued'; agentId: string; triggerType: string; queueId: number }
+  | { type: 'invocation:completed'; agentId: string; triggerType: string; queueId: number }
+  | { type: 'invocation:failed'; agentId: string; triggerType: string; queueId: number; error: string }
+  | { type: 'invocation:rate_limited'; agentId: string; retryAfter: string }
+  // Connector events
+  | { type: 'connector:started'; agentId: string; platform: string }
+  | { type: 'connector:stopped'; agentId: string; platform: string }
+  | { type: 'connector:error'; agentId: string; platform: string; error: string }
+  // Integration config events (used by connector loader to hot-reload)
+  | { type: 'integration:config_updated'; agentId: string; platform: string }
 
 type Handler = (event: AppEvent) => void
 

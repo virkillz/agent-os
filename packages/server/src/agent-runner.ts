@@ -415,6 +415,19 @@ export function clearSession(agentId: string): void {
 }
 
 /**
+ * Unified invocation entry point — runs a fresh isolated session for any
+ * non-interactive trigger (scheduler, Slack, Telegram, etc.).
+ * Identical to runScheduledTask but named to match the design vocabulary.
+ */
+export async function invokeAgent(
+  agent: AgentRecord,
+  prompt: string,
+  defaultModel: ModelConfig,
+): Promise<string> {
+  return runScheduledTask(agent, prompt, defaultModel)
+}
+
+/**
  * Run a scheduled task in a fresh, isolated session that is never stored in
  * liveSessions.  The full context is: buildSystemPrompt + the task message.
  */

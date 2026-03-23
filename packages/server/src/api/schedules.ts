@@ -41,6 +41,13 @@ export function createSchedulesRouter(): Router {
     const row = db
       .prepare('SELECT * FROM agent_schedules WHERE id = ?')
       .get(result.lastInsertRowid) as unknown as ScheduleRow
+
+    // Auto-insert scheduler trigger for this schedule
+    const triggerLabel = label?.trim() || cron.trim()
+    db.prepare(
+      "INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label, source_id) VALUES (lower(hex(randomblob(16))), ?, 'scheduler', ?, ?)"
+    ).run(req.params.id, triggerLabel, String(result.lastInsertRowid))
+
     res.status(201).json(row)
   })
 
@@ -74,6 +81,10 @@ export function createSchedulesRouter(): Router {
     }
     if (updates.label !== undefined) {
       db.prepare('UPDATE agent_schedules SET label = ? WHERE id = ?').run(updates.label, req.params.sid)
+      if (updates.label.trim()) {
+        db.prepare("UPDATE agent_triggers SET label = ? WHERE type = 'scheduler' AND source_id = ?")
+          .run(updates.label.trim(), req.params.sid)
+      }
     }
     if (updates.enabled !== undefined) {
       db.prepare('UPDATE agent_schedules SET enabled = ? WHERE id = ?').run(updates.enabled, req.params.sid)
@@ -103,8 +114,11 @@ export function createSchedulesRouter(): Router {
 
   // DELETE /api/agents/:id/schedules/:sid
   router.delete('/:id/schedules/:sid', (req, res) => {
-    getDb()
-      .prepare('DELETE FROM agent_schedules WHERE id = ? AND agent_id = ?')
+    const db = getDb()
+    db.prepare('DELETE FROM agent_schedules WHERE id = ? AND agent_id = ?')
+      .run(req.params.sid, req.params.id)
+    // Remove corresponding scheduler trigger
+    db.prepare("DELETE FROM agent_triggers WHERE type = 'scheduler' AND source_id = ? AND agent_id = ?")
       .run(req.params.sid, req.params.id)
     res.json({ ok: true })
   })

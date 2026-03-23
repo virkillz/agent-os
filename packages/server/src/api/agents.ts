@@ -84,6 +84,11 @@ export function createAgentsRouter(): Router {
       randomAvatarUrl(),
     )
 
+    // Auto-insert internal_chat trigger for the new agent
+    getDb().prepare(
+      "INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label) VALUES (lower(hex(randomblob(16))), ?, 'internal_chat', 'Web UI Chat')"
+    ).run(id)
+
     const agent = getDb().prepare('SELECT * FROM agents WHERE id = ?').get(id) as unknown as AgentRow
     res.status(201).json({ ...agent, modelConfig: JSON.parse(agent.model_config) })
   })

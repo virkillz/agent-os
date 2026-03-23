@@ -297,6 +297,50 @@ export const api = {
     delete: (id: string) => req<{ ok: boolean }>('DELETE', `/provider-accounts/${id}`),
     clearCooldown: (id: string) => req<{ ok: boolean }>('POST', `/provider-accounts/${id}/clear-cooldown`),
   },
+
+  // ─── Integrations ─────────────────────────────────────────────────────────
+
+  integrations: {
+    list: (agentId: string) =>
+      req<Integration[]>('GET', `/agents/${agentId}/integrations`),
+    get: (agentId: string, iid: string) =>
+      req<Integration>('GET', `/agents/${agentId}/integrations/${iid}`),
+    create: (agentId: string, data: { platform: 'slack' | 'telegram'; config: Record<string, unknown> }) =>
+      req<Integration>('POST', `/agents/${agentId}/integrations`, data),
+    patch: (agentId: string, iid: string, data: { config?: Record<string, unknown>; enabled?: number }) =>
+      req<Integration>('PATCH', `/agents/${agentId}/integrations/${iid}`, data),
+    delete: (agentId: string, iid: string) =>
+      req<{ ok: boolean }>('DELETE', `/agents/${agentId}/integrations/${iid}`),
+    platformMessages: (agentId: string, opts?: { platform?: string; scope_id?: string; thread_id?: string; limit?: number }) => {
+      const params = new URLSearchParams()
+      if (opts?.platform) params.set('platform', opts.platform)
+      if (opts?.scope_id) params.set('scope_id', opts.scope_id)
+      if (opts?.thread_id) params.set('thread_id', opts.thread_id)
+      if (opts?.limit) params.set('limit', String(opts.limit))
+      const qs = params.toString() ? `?${params.toString()}` : ''
+      return req<PlatformMessage[]>('GET', `/agents/${agentId}/platform-messages${qs}`)
+    },
+  },
+
+  // ─── Triggers ─────────────────────────────────────────────────────────────
+
+  triggers: {
+    list: (agentId: string) =>
+      req<Trigger[]>('GET', `/agents/${agentId}/triggers`),
+    patch: (agentId: string, triggerId: string, data: { enabled: number }) =>
+      req<Trigger>('PATCH', `/agents/${agentId}/triggers/${triggerId}`, data),
+    delete: (agentId: string, triggerId: string) =>
+      req<{ ok: boolean }>('DELETE', `/agents/${agentId}/triggers/${triggerId}`),
+    previewPrompt: (agentId: string, triggerId: string) =>
+      req<TriggerPreview>('GET', `/agents/${agentId}/triggers/${triggerId}/preview-prompt`),
+    invocations: (agentId: string, triggerId: string, opts?: { status?: string; limit?: number }) => {
+      const params = new URLSearchParams()
+      if (opts?.status) params.set('status', opts.status)
+      if (opts?.limit) params.set('limit', String(opts.limit))
+      const qs = params.toString() ? `?${params.toString()}` : ''
+      return req<InvocationRow[]>('GET', `/agents/${agentId}/triggers/${triggerId}/invocations${qs}`)
+    },
+  },
 }
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
@@ -542,4 +586,69 @@ export interface Notification {
   meta: string
   created_at: string
   is_read: boolean
+}
+
+export interface Trigger {
+  id: string
+  agent_id: string
+  type: 'scheduler' | 'internal_chat' | 'slack_dm' | 'slack_channel' | 'telegram_dm' | 'telegram_group'
+  label: string
+  source_id: string | null
+  platform: string | null
+  scope_type: string | null
+  scope_id: string | null
+  enabled: number
+  last_fired_at: string | null
+  fire_count: number
+  created_at: string
+}
+
+export interface TriggerPreview {
+  system_prompt: string
+  trigger_context_addendum: string
+  trigger_prompt?: string
+  conversation_history: { sender: string; sender_type: string; content: string; timestamp: string }[]
+  history_window: number
+  total_history_available?: number
+}
+
+export interface Integration {
+  id: string
+  agent_id: string
+  platform: 'slack' | 'telegram'
+  config: Record<string, unknown>
+  enabled: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PlatformMessage {
+  id: number
+  agent_id: string
+  platform: string
+  message_type: 'message' | 'reaction'
+  direction: 'inbound' | 'outbound'
+  scope_type: string
+  scope_id: string
+  thread_id: string | null
+  external_msg_id: string | null
+  reply_to_msg_id: string | null
+  sender_id: string
+  sender_name: string
+  sender_type: 'user' | 'agent'
+  content: string
+  created_at: string
+}
+
+export interface InvocationRow {
+  id: number
+  agent_id: string
+  trigger_id: string | null
+  trigger_type: string
+  payload: string
+  status: 'pending' | 'processing' | 'done' | 'failed'
+  retry_count: number
+  retry_after: string | null
+  created_at: string
+  processed_at: string | null
 }

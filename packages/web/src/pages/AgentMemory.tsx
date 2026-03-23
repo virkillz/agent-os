@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
 import { MemorySection } from '../components/agent-settings/MemorySection.tsx'
 import PageHeader from '../components/PageHeader.tsx'
+import { AgentProfileCard } from '../components/AgentProfileCard.tsx'
 
 export default function AgentMemory() {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +31,7 @@ export default function AgentMemory() {
           subtitle={`${agent.name} • View agent memory`}
           backTo={`/agents/${id}`}
         />
+        <AgentProfileCard agentId={id} />
         <MemorySection agentId={id} />
       </div>
     </div>

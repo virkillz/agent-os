@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
 import { ScheduleSection } from '../components/agent-settings/ScheduleSection.tsx'
 import PageHeader from '../components/PageHeader.tsx'
+import { AgentProfileCard } from '../components/AgentProfileCard.tsx'
 
 export default function AgentSchedule() {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +31,7 @@ export default function AgentSchedule() {
           subtitle={`${agent.name} • View schedule`}
           backTo={`/agents/${id}`}
         />
+        <AgentProfileCard agentId={id} />
         <ScheduleSection agentId={id} />
       </div>
     </div>

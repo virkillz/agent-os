@@ -243,6 +243,84 @@ function runMigrations(db: DB): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- ── Trigger Registry ──────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS agent_triggers (
+      id            TEXT PRIMARY KEY,
+      agent_id      TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      type          TEXT NOT NULL,
+      -- 'scheduler' | 'internal_chat' | 'slack_dm' | 'slack_channel' | 'telegram_dm' | 'telegram_group'
+      label         TEXT NOT NULL,
+      source_id     TEXT,     -- for type='scheduler': agent_schedules.id (as text)
+      platform      TEXT,     -- 'slack' | 'telegram' | NULL
+      scope_type    TEXT,     -- 'dm' | 'channel' | 'group' | NULL
+      scope_id      TEXT,
+      enabled       INTEGER NOT NULL DEFAULT 1,
+      last_fired_at TEXT,
+      fire_count    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_triggers_agent ON agent_triggers(agent_id);
+
+    -- ── Invocation Queue ──────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS invocation_queue (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id     TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      trigger_id   TEXT REFERENCES agent_triggers(id),
+      trigger_type TEXT NOT NULL,
+      payload      TEXT NOT NULL,   -- JSON: { prompt: string, ... }
+      status       TEXT NOT NULL DEFAULT 'pending',   -- 'pending' | 'processing' | 'done' | 'failed'
+      retry_count  INTEGER NOT NULL DEFAULT 0,
+      retry_after  TEXT,            -- ISO timestamp; NULL = ready to process
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      processed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_invocation_queue_ready
+      ON invocation_queue(agent_id, status, retry_after);
+    CREATE INDEX IF NOT EXISTS idx_invocation_queue_trigger
+      ON invocation_queue(trigger_id, created_at);
+
+    -- ── Agent Integrations ────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS agent_integrations (
+      id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      platform    TEXT NOT NULL,   -- 'slack' | 'telegram'
+      config      TEXT NOT NULL DEFAULT '{}',   -- JSON blob
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(agent_id, platform)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_integrations_agent ON agent_integrations(agent_id);
+
+    -- ── Platform Messages ─────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS platform_messages (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      platform        TEXT NOT NULL,      -- 'slack' | 'telegram'
+      message_type    TEXT NOT NULL DEFAULT 'message',  -- 'message' | 'reaction'
+      direction       TEXT NOT NULL,      -- 'inbound' | 'outbound'
+      scope_type      TEXT NOT NULL,      -- 'dm' | 'channel' | 'group'
+      scope_id        TEXT NOT NULL,
+      thread_id       TEXT,
+      external_msg_id TEXT,
+      reply_to_msg_id TEXT,
+      sender_id       TEXT NOT NULL,
+      sender_name     TEXT NOT NULL,
+      sender_type     TEXT NOT NULL,      -- 'user' | 'agent'
+      content         TEXT NOT NULL,
+      raw_payload     TEXT,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(platform, external_msg_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_messages_scope
+      ON platform_messages(agent_id, platform, scope_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_messages_thread
+      ON platform_messages(agent_id, platform, thread_id, created_at);
+
     -- ── Channels + Messages ───────────────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS channels (
@@ -268,6 +346,28 @@ function runMigrations(db: DB): void {
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_channel_messages ON channel_messages(channel_id, created_at);
+  `)
+
+  // ── Trigger backfills for existing installs ──────────────────────────────
+  // Insert internal_chat trigger for any agent that doesn't have one yet
+  db.exec(`
+    INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label)
+    SELECT lower(hex(randomblob(16))), id, 'internal_chat', 'Web UI Chat'
+    FROM agents
+    WHERE id NOT IN (
+      SELECT agent_id FROM agent_triggers WHERE type = 'internal_chat'
+    )
+  `)
+  // Insert scheduler trigger for any agent_schedule that doesn't have one yet
+  db.exec(`
+    INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label, source_id)
+    SELECT lower(hex(randomblob(16))), s.agent_id, 'scheduler',
+           CASE WHEN s.label != '' THEN s.label ELSE s.cron END,
+           CAST(s.id AS TEXT)
+    FROM agent_schedules s
+    WHERE CAST(s.id AS TEXT) NOT IN (
+      SELECT source_id FROM agent_triggers WHERE type = 'scheduler' AND source_id IS NOT NULL
+    )
   `)
 
   // Additive column migrations for existing installs
@@ -394,15 +494,25 @@ You can read and modify source files to help with bug fixes, new features, and p
         'INSERT INTO agents (id, name, role, description, system_prompt, model_config, avatar_color, avatar_url, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)',
       ).run(agentId, a.name, a.role, a.description, a.system_prompt, '{}', a.avatar_color, a.avatar_url)
 
-      // Seed group chat monitoring schedule for each default agent
+      // Auto-insert internal_chat trigger for this agent
       db.prepare(
+        "INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label) VALUES (lower(hex(randomblob(16))), ?, 'internal_chat', 'Web UI Chat')"
+      ).run(agentId)
+
+      // Seed group chat monitoring schedule for each default agent
+      const schedResult = db.prepare(
         'INSERT INTO agent_schedules (agent_id, cron, prompt, label, enabled) VALUES (?, ?, ?, ?, 1)',
       ).run(
         agentId,
         '*/15 * * * *',
         'Check the public channel, and decide if you want to post something. You can decide to post or not.',
         'Public channel monitoring',
-      )
+      ) as { lastInsertRowid: number | bigint }
+
+      // Auto-insert scheduler trigger for this schedule
+      db.prepare(
+        "INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label, source_id) VALUES (lower(hex(randomblob(16))), ?, 'scheduler', 'Public channel monitoring', ?)"
+      ).run(agentId, String(schedResult.lastInsertRowid))
     }
   }
 
@@ -564,6 +674,63 @@ export interface PluginRow {
   display_name: string
   description: string
   configured: number
+}
+
+export interface AgentTriggerRow {
+  id: string
+  agent_id: string
+  type: string
+  label: string
+  source_id: string | null
+  platform: string | null
+  scope_type: string | null
+  scope_id: string | null
+  enabled: number
+  last_fired_at: string | null
+  fire_count: number
+  created_at: string
+}
+
+export interface InvocationQueueRow {
+  id: number
+  agent_id: string
+  trigger_id: string | null
+  trigger_type: string
+  payload: string
+  status: string
+  retry_count: number
+  retry_after: string | null
+  created_at: string
+  processed_at: string | null
+}
+
+export interface AgentIntegrationRow {
+  id: string
+  agent_id: string
+  platform: 'slack' | 'telegram'
+  config: string  // JSON
+  enabled: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PlatformMessageRow {
+  id: number
+  agent_id: string
+  platform: string
+  message_type: 'message' | 'reaction'
+  direction: 'inbound' | 'outbound'
+  scope_type: string
+  scope_id: string
+  thread_id: string | null
+  external_msg_id: string | null
+  reply_to_msg_id: string | null
+  sender_id: string
+  sender_name: string
+  sender_type: 'user' | 'agent'
+  content: string
+  raw_payload: string | null
+  created_at: string
 }
 
 export interface NotificationRow {

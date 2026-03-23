@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
 import { TodosSection } from '../components/agent-settings/TodosSection.tsx'
 import PageHeader from '../components/PageHeader.tsx'
+import { AgentProfileCard } from '../components/AgentProfileCard.tsx'
 
 export default function AgentTodos() {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +31,7 @@ export default function AgentTodos() {
           subtitle={`${agent.name} • Manage tasks`}
           backTo={`/agents/${id}`}
         />
+        <AgentProfileCard agentId={id} />
         <TodosSection agentId={id} />
       </div>
     </div>

@@ -12,8 +12,10 @@ import { PlatformToolsSection } from '../components/agent-settings/PlatformTools
 import { PromptSection } from '../components/agent-settings/PromptSection.tsx'
 import { TerminateSection } from '../components/agent-settings/TerminateSection.tsx'
 import { SessionsSection } from '../components/agent-settings/SessionsSection.tsx'
+import { TriggersSection } from '../components/agent-settings/TriggersSection.tsx'
+import { IntegrationsSection } from '../components/agent-settings/IntegrationsSection.tsx'
 
-type Section = 'profile' | 'avatar' | 'model' | 'skills' | 'platform-tools' | 'plugins' | 'prompt' | 'sessions' | 'terminate'
+type Section = 'profile' | 'avatar' | 'model' | 'skills' | 'platform-tools' | 'plugins' | 'prompt' | 'triggers' | 'integrations' | 'sessions' | 'terminate'
 
 const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'profile', label: 'Profile' },
@@ -23,6 +25,8 @@ const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'platform-tools', label: 'Platform Tools' },
   { id: 'plugins', label: 'Plugins' },
   { id: 'prompt', label: 'System Prompt' },
+  { id: 'triggers', label: 'Triggers' },
+  { id: 'integrations', label: 'Integrations' },
   { id: 'sessions', label: 'Sessions' },
   { id: 'terminate', label: 'Terminate', danger: true },
 ]
@@ -198,6 +202,8 @@ export default function AgentSettings() {
         {section === 'platform-tools' && <PlatformToolsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'plugins' && <PluginsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'prompt' && id && <PromptSection agentId={id} />}
+        {section === 'triggers' && id && <TriggersSection agentId={id} />}
+        {section === 'integrations' && id && <IntegrationsSection agentId={id} />}
         {section === 'sessions' && id && <SessionsSection agentId={id} />}
         {section === 'terminate' && id && <TerminateSection agent={agent} agentId={id} />}
       </div>

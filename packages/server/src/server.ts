@@ -22,7 +22,11 @@ import { createSkillsRouter } from './api/skills.js'
 import { createPlatformToolsRouter } from './api/platform-tools.js'
 import { createNotificationsRouter } from './api/notifications.js'
 import { createProviderAccountsRouter } from './api/provider-accounts.js'
+import { createTriggersRouter } from './api/triggers.js'
+import { createIntegrationsRouter } from './api/integrations.js'
 import { createNotification } from './notification-service.js'
+import { startQueueWorker } from './queue-worker.js'
+import { connectorLoader } from './connectors/loader.js'
 import { getDb } from './db.js'
 
 export function createApp(opts: { webDistDir?: string; workspaceDir?: string; dataDir?: string } = {}) {
@@ -61,6 +65,8 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
   app.use('/api/channels', createChannelsRouter())
   app.use('/api/notifications', createNotificationsRouter())
   app.use('/api/provider-accounts', createProviderAccountsRouter())
+  app.use('/api/agents', createTriggersRouter())
+  app.use('/api/agents', createIntegrationsRouter())
 
   // Health check
   app.get('/api/health', (_req, res) => res.json({ ok: true }))
@@ -101,6 +107,9 @@ export function startServer(port: number, webDistDir?: string, workspaceDir?: st
       createNotification({ type: 'board', message: `Card moved: "${event.title}"`, sourceEvent: 'board:card_moved', meta: { cardId: event.cardId, boardId: event.boardId, laneId: event.laneId } })
     }
   })
+
+  startQueueWorker()
+  void connectorLoader.start()
 
   server.listen(port, () => {
     console.log(`  Server running at http://localhost:${port}`)

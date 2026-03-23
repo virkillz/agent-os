@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
 import { MessageCircle, Brain, CheckSquare, Calendar, Settings, type LucideIcon } from 'lucide-react'
 import PageHeader from '../components/PageHeader.tsx'
+import { AgentProfileCard } from '../components/AgentProfileCard.tsx'
 
 export default function AgentProfile() {
   const { id } = useParams<{ id: string }>()
@@ -9,7 +10,7 @@ export default function AgentProfile() {
   const { agents, agentStatus } = useStore()
   const agent = agents.find((a) => a.id === id)
 
-  if (!agent) {
+  if (!agent || !id) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -21,16 +22,6 @@ export default function AgentProfile() {
       </div>
     )
   }
-
-  const dotColor = !agent.is_active ? 'var(--status-gray)'
-    : agentStatus[agent.id] === 'thinking' ? 'var(--status-amber)'
-    : agentStatus[agent.id] === 'error' ? 'var(--status-red)'
-    : 'var(--status-green)'
-
-  const statusLabel = !agent.is_active ? 'Offline'
-    : agentStatus[agent.id] === 'thinking' ? 'Working'
-    : agentStatus[agent.id] === 'error' ? 'Error'
-    : 'Online'
 
   const menuItems = [
     {
@@ -80,94 +71,7 @@ export default function AgentProfile() {
           backTo="/roster"
         />
 
-        {/* ── Agent Profile Card ── */}
-        <div
-          className="rounded-xl p-8 mb-8 relative overflow-hidden"
-          style={{
-            background: 'rgba(10, 22, 45, 0.85)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            border: '1px solid rgba(100, 210, 230, 0.15)',
-          }}
-        >
-          {/* Top glow */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[1px]"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.3), transparent)' }}
-          />
-
-          <div className="flex flex-col items-center text-center">
-            {/* Avatar */}
-            <div className="relative mb-4">
-              {agent.avatar_url ? (
-                <img
-                  src={agent.avatar_url}
-                  alt={agent.name}
-                  className="w-32 h-32 rounded-2xl object-cover"
-                  style={{
-                    border: '3px solid rgba(100, 210, 230, 0.2)',
-                  }}
-                />
-              ) : (
-                <div
-                  className="w-32 h-32 rounded-2xl flex items-center justify-center text-5xl font-bold"
-                  style={{
-                    backgroundColor: 'rgba(100, 210, 230, 0.1)',
-                    border: '3px solid rgba(100, 210, 230, 0.2)',
-                    color: 'rgba(140, 220, 235, 0.8)',
-                  }}
-                >
-                  {agent.name[0].toUpperCase()}
-                </div>
-              )}
-              {/* Status dot */}
-              <span
-                className={`absolute bottom-2 right-2 w-5 h-5 rounded-full ${agentStatus[agent.id] === 'thinking' ? 'animate-pulse' : ''}`}
-                style={{
-                  background: dotColor,
-                  border: '3px solid rgba(10, 22, 45, 0.9)',
-                }}
-              />
-            </div>
-
-            {/* Name */}
-            <h1
-              className="text-2xl font-bold tracking-[0.15em] uppercase mb-2"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {agent.name}
-            </h1>
-
-            {/* Role */}
-            <p
-              className="text-sm tracking-wider uppercase mb-3"
-              style={{ color: 'rgba(130, 160, 185, 0.6)' }}
-            >
-              {agent.role}
-            </p>
-
-            {/* Status badge */}
-            <span
-              className="text-xs font-bold px-3 py-1.5 rounded-full tracking-wider uppercase"
-              style={{
-                background: dotColor + '18',
-                color: dotColor,
-              }}
-            >
-              {statusLabel}
-            </span>
-
-            {/* Description */}
-            {agent.description && (
-              <p
-                className="mt-4 text-sm max-w-md"
-                style={{ color: 'rgba(160, 180, 200, 0.7)' }}
-              >
-                {agent.description}
-              </p>
-            )}
-          </div>
-        </div>
+        <AgentProfileCard agentId={id} />
 
         {/* ── Action Menu Grid ── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
