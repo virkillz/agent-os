@@ -3,6 +3,10 @@ import { type Agent } from '../../api.ts'
 
 const DEFAULT_AVATARS = Array.from({ length: 15 }, (_, i) => `/default_avatar/avatar_${i + 1}.jpg`)
 const PIXEL_AVATARS = Array.from({ length: 17 }, (_, i) => `/pixel_avatar/avatar_${i + 1}.jpg`)
+const ROBOT_AVATARS = [
+  '/robots/robots.png',
+  ...Array.from({ length: 18 }, (_, i) => i < 10 ? `/robots/avatar_ ${i}.png` : `/robots/avatar_${i}.png`),
+]
 const AVATAR_COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#ec4899', '#14b8a6', '#f97316']
 
 export function AvatarSection({
@@ -12,7 +16,7 @@ export function AvatarSection({
   agent: Agent
   onSave: (data: Partial<Agent & { systemPrompt: string }>) => Promise<unknown>
 }) {
-  const [tab, setTab] = useState<'default' | 'pixel' | 'custom'>('default')
+  const [tab, setTab] = useState<'robots' | 'default' | 'pixel' | 'custom'>('robots')
   const [selectedUrl, setSelectedUrl] = useState(agent.avatar_url)
   const [selectedColor, setSelectedColor] = useState(agent.avatar_color)
   const [saving, setSaving] = useState(false)
@@ -41,7 +45,7 @@ export function AvatarSection({
     reader.readAsDataURL(file)
   }
 
-  const avatarList = tab === 'pixel' ? PIXEL_AVATARS : DEFAULT_AVATARS
+  const avatarList = tab === 'pixel' ? PIXEL_AVATARS : tab === 'robots' ? ROBOT_AVATARS : DEFAULT_AVATARS
 
   return (
     <div className="flex-1 overflow-y-auto flex items-start justify-center py-8 px-6">
@@ -91,7 +95,7 @@ export function AvatarSection({
         {/* Tabs */}
         <div>
           <div className="flex gap-1 mb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            {(['default', 'pixel', 'custom'] as const).map((t) => (
+            {(['robots', 'default', 'pixel', 'custom'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -102,7 +106,7 @@ export function AvatarSection({
                   marginBottom: '-1px',
                 }}
               >
-                {t === 'default' ? 'Default' : t === 'pixel' ? 'Pixel' : 'Custom'}
+                {t === 'robots' ? 'Robots' : t === 'default' ? 'Default' : t === 'pixel' ? 'Pixel' : 'Custom'}
               </button>
             ))}
           </div>

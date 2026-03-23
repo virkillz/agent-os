@@ -1,44 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api, type Provider, type User } from '../api.ts'
-import { useStore } from '../store.ts'
 
-
-type Step = 'company' | 'provider' | 'account'
+type Step = 'provider' | 'account'
 
 interface OnboardingProps {
   onComplete: (user?: User) => void
 }
 
 export default function Onboarding({ onComplete, startAtAccount }: OnboardingProps & { startAtAccount?: boolean }) {
-  const { settings } = useStore()
-  const [step, setStep] = useState<Step>(startAtAccount ? 'account' : 'company')
-  const [companyName, setCompanyName] = useState(startAtAccount ? (settings?.companyName ?? '') : 'Rascal Inc')
-  const [companyMission, setCompanyMission] = useState('A highly questionable organization run entirely by AI agents with just enough intelligence to be dangerous and just enough mischief to make it interesting.')
+  const [step, setStep] = useState<Step>(startAtAccount ? 'account' : 'provider')
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>('openrouter')
   const [apiKey, setApiKey] = useState('')
-  const [adminUsername, setAdminUsername] = useState('chief')
-  const [adminDisplayName, setAdminDisplayName] = useState('Chief Rascal')
+  const [adminUsername, setAdminUsername] = useState('')
+  const [adminDisplayName, setAdminDisplayName] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const { updateSettings } = useStore()
 
-  async function handleCompanyContinue() {
-    if (!companyName.trim()) { setError('Company name is required'); return }
-    setSaving(true)
-    setError('')
-    try {
-      await updateSettings({ companyName: companyName.trim(), companyMission: companyMission.trim() })
-      const list = await api.settings.providers()
-      setProviders(list)
-      setStep('provider')
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
-    } finally {
-      setSaving(false)
+  useEffect(() => {
+    if (!startAtAccount) {
+      api.settings.providers().then(setProviders).catch(() => {})
     }
-  }
+  }, [startAtAccount])
 
   async function handleSaveProvider() {
     if (!apiKey.trim()) { setError('API key required'); return }
@@ -65,7 +49,6 @@ export default function Onboarding({ onComplete, startAtAccount }: OnboardingPro
         username: adminUsername.trim(),
         displayName: adminDisplayName.trim(),
         password: adminPassword,
-        companyName: companyName.trim(),
       })
       const user = await api.auth.login(adminUsername.trim(), adminPassword)
       onComplete(user)
@@ -86,73 +69,36 @@ export default function Onboarding({ onComplete, startAtAccount }: OnboardingPro
         {/* Logo */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2">
-            <img src="/logo.png" alt="Rascal Inc" className="w-36 h-36 rounded-lg object-cover" />
+            <img src="/logo.png" alt="Logo" className="w-36 h-36 rounded-lg object-cover" />
           </div>
-          <div className="text-white font-semibold text-lg">Rascal-Inc</div>
+          <div className="text-white font-semibold text-lg">Agent OS</div>
           <p className="text-muted text-sm">virtual company platform</p>
         </div>
 
         {/* Step indicators */}
-        <div className="flex items-center justify-center gap-2">
-          {(['company', 'provider', 'account'] as Step[]).map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <button
-                className={`w-2.5 h-2.5 rounded-full transition-all ${
-                  s === step
-                    ? 'bg-accent scale-110'
-                    : steps_done(s, step)
-                    ? 'bg-accent/40 hover:bg-accent/70 cursor-pointer'
-                    : 'bg-white/20 cursor-default'
-                }`}
-                onClick={() => { if (steps_done(s, step)) { setError(''); setStep(s) } }}
-                disabled={!steps_done(s, step)}
-                aria-label={`Go to ${s} step`}
-              />
-              {i < 2 && <div className="w-6 h-px bg-white/20" />}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Step 1: Company ── */}
-        {step === 'company' && (
-          <div className="space-y-5">
-            <div>
-              <h1 className="text-xl font-semibold text-white">Let's setup your virtual company!</h1>
-              <p className="text-sm text-muted mt-1">Give your virtual company a name and purpose.</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-subtle mb-1.5">Company name *</label>
-                <input
-                  className="input"
-                  placeholder="Acme Corp"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCompanyContinue()}
-                  autoFocus
+        {!startAtAccount && (
+          <div className="flex items-center justify-center gap-2">
+            {(['provider', 'account'] as Step[]).map((s, i) => (
+              <div key={s} className="flex items-center gap-2">
+                <button
+                  className={`w-2.5 h-2.5 rounded-full transition-all ${
+                    s === step
+                      ? 'bg-accent scale-110'
+                      : steps_done(s, step)
+                      ? 'bg-accent/40 hover:bg-accent/70 cursor-pointer'
+                      : 'bg-white/20 cursor-default'
+                  }`}
+                  onClick={() => { if (steps_done(s, step)) { setError(''); setStep(s) } }}
+                  disabled={!steps_done(s, step)}
+                  aria-label={`Go to ${s} step`}
                 />
+                {i < 1 && <div className="w-6 h-px bg-white/20" />}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-subtle mb-1.5">Mission <span className="text-muted font-normal">(optional)</span></label>
-                <textarea
-                  className="input resize-none h-20"
-                  placeholder="What does your company do?"
-                  value={companyMission}
-                  onChange={(e) => setCompanyMission(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {error && <p className="text-red-400 text-xs">{error}</p>}
-
-            <button className="btn-primary w-full" onClick={handleCompanyContinue} disabled={saving}>
-              {saving ? 'Saving...' : 'Continue'}
-            </button>
+            ))}
           </div>
         )}
 
-        {/* ── Step 2: Provider ── */}
+        {/* ── Step 1: Provider ── */}
         {step === 'provider' && (
           <div className="space-y-5">
             <div>
@@ -237,7 +183,7 @@ export default function Onboarding({ onComplete, startAtAccount }: OnboardingPro
           </div>
         )}
 
-        {/* ── Step 3: Admin account ── */}
+        {/* ── Step 2: Admin account ── */}
         {step === 'account' && (
           <div className="space-y-5">
             <div>
@@ -295,6 +241,6 @@ export default function Onboarding({ onComplete, startAtAccount }: OnboardingPro
 }
 
 function steps_done(s: Step, current: Step): boolean {
-  const order: Step[] = ['company', 'provider', 'account']
+  const order: Step[] = ['provider', 'account']
   return order.indexOf(s) < order.indexOf(current)
 }

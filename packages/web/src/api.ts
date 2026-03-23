@@ -19,8 +19,6 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export interface Settings {
   firstRun: boolean
   needsSetup: boolean
-  companyName: string
-  companyMission: string
   companyLogo: string
   platformPrompt: string
   defaultModel: { provider: string; modelId: string; thinkingLevel: string }
@@ -55,7 +53,7 @@ export const api = {
     login: (username: string, password: string) =>
       req<User>('POST', '/users/login', { username, password }),
     logout: () => req<{ ok: boolean }>('POST', '/users/logout'),
-    setup: (data: { username: string; displayName: string; password: string; companyName: string }) =>
+    setup: (data: { username: string; displayName: string; password: string }) =>
       req<User>('POST', '/setup', data),
   },
 

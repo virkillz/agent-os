@@ -3,8 +3,6 @@ import { useStore } from '../../store.ts'
 
 export default function SettingsCompany() {
   const { settings, updateSettings } = useStore()
-  const [name, setName] = useState(settings?.companyName ?? '')
-  const [mission, setMission] = useState(settings?.companyMission ?? '')
   const [logo, setLogo] = useState(settings?.companyLogo ?? '/rascals.png')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -12,12 +10,11 @@ export default function SettingsCompany() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleSave() {
-    if (!name.trim()) { setError('Company name is required'); return }
     setSaving(true)
     setError('')
     setSaved(false)
     try {
-      await updateSettings({ companyName: name.trim(), companyMission: mission.trim(), companyLogo: logo })
+      await updateSettings({ companyLogo: logo })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e: unknown) {
@@ -42,10 +39,10 @@ export default function SettingsCompany() {
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
         <div>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Company
+            Branding
           </h2>
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-            Your virtual company identity.
+            Customize the platform logo.
           </p>
         </div>
 
@@ -61,7 +58,7 @@ export default function SettingsCompany() {
             >
               <img
                 src={logo}
-                alt="Company logo"
+                alt="Logo"
                 className="w-full h-full object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).src = '/rascals.png' }}
               />
@@ -83,32 +80,6 @@ export default function SettingsCompany() {
               <p className="text-xs" style={{ color: 'var(--muted)' }}>PNG, JPG up to 2MB</p>
             </div>
           </div>
-        </div>
-
-        {/* Name */}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>
-            Name
-          </p>
-          <input
-            className="input w-full"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Rascal Inc"
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>
-            Description
-          </p>
-          <textarea
-            className="input w-full resize-none h-24"
-            value={mission}
-            onChange={(e) => setMission(e.target.value)}
-            placeholder="What does your company do?"
-          />
         </div>
 
         {error && <p className="text-red-400 text-xs">{error}</p>}

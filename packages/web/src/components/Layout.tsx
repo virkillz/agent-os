@@ -8,7 +8,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ currentUser, onLogout }: LayoutProps) {
-  const { loadAgents, settings } = useStore()
+  const { loadAgents } = useStore()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -61,9 +61,9 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
               </div>
               <span
                 className="text-sm font-bold tracking-wide"
-                style={{ color: 'rgba(220, 238, 248, 0.95)' }}
+                style={{ color: 'rgba(220, 238, 248, 0.95)', fontFamily: "'Bitcount Prop Single Circle', monospace" }}
               >
-                {settings?.companyName || 'Robot Magang'}
+                Agent OS
               </span>
             </button>
           </div>

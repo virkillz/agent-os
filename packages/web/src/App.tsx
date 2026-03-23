@@ -6,6 +6,7 @@ import { api, type User } from './api.ts'
 import Onboarding from './pages/Onboarding.tsx'
 import Login from './pages/Login.tsx'
 import Roster from './pages/Roster.tsx'
+import AgentProfile from './pages/AgentProfile.tsx'
 import AgentChat from './pages/AgentChat.tsx'
 import AgentSettings from './pages/AgentSettings.tsx'
 import Settings from './pages/Settings.tsx'
@@ -87,7 +88,7 @@ export default function App() {
     )
   }
 
-  // First-run setup wizard (no company name set OR no users exist yet)
+  // First-run setup wizard (no users exist yet)
   if (settings?.firstRun || settings?.needsSetup) {
     return (
       <ThemeProvider>
@@ -119,7 +120,8 @@ export default function App() {
             <Route path="/channels/:id" element={<Channels />} />
             <Route path="/board" element={<Board />} />
             <Route path="/roster" element={<Roster />} />
-            <Route path="/agents/:id" element={<AgentChat />} />
+            <Route path="/agents/:id" element={<AgentProfile />} />
+            <Route path="/agents/:id/chat" element={<AgentChat />} />
             <Route path="/agents/:id/settings" element={<AgentSettings />} />
             <Route path="/workspace" element={<Workspace />} />
             <Route path="/notifications" element={<Notifications />} />

@@ -200,17 +200,15 @@ export function createSetupRouter(): Router {
       return res.status(409).json({ error: 'Platform already initialized' })
     }
 
-    const { username, displayName, password, companyName } = req.body as {
+    const { username, displayName, password } = req.body as {
       username?: string
       displayName?: string
       password?: string
-      companyName?: string
     }
 
     if (!username?.trim()) return res.status(400).json({ error: 'username required' })
     if (!displayName?.trim()) return res.status(400).json({ error: 'displayName required' })
     if (!password) return res.status(400).json({ error: 'password required' })
-    if (!companyName?.trim()) return res.status(400).json({ error: 'companyName required' })
 
     const id = randomUUID()
     const hash = await hashPassword(password)
@@ -218,12 +216,11 @@ export function createSetupRouter(): Router {
       .prepare('INSERT INTO users (id, username, display_name, avatar_color, password_hash, is_admin) VALUES (?, ?, ?, ?, ?, 1)')
       .run(id, username.trim().toLowerCase(), displayName.trim(), '#7c6af7', hash)
 
-    // Store company settings
+    // Set default platform prompt
     const db = getDb()
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('company_name', companyName.trim())
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
       'platform_prompt',
-      'You are an AI agent working for {company_name}. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.',
+      'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.',
     )
 
     const user = getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as UserRow

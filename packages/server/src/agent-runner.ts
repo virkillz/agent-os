@@ -92,11 +92,9 @@ function ensureSopFile(workspaceDir: string): void {
 
 export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): string {
   // ── Layer 1: Platform prompt ─────────────────────────────────────────────
-  const companyName = getSetting('company_name') ?? 'this company'
   const rawPlatformPrompt = getSetting('platform_prompt') ??
-    'You are an AI agent working for {company_name}. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.'
+    'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.'
   const platformPrompt = rawPlatformPrompt
-    .replace('{company_name}', companyName)
     .replace('{working_directory}', workspaceDir)
 
   // ── Layer 2: SOP.md ──────────────────────────────────────────────────────

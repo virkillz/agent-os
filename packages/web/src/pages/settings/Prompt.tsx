@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../../store.ts'
 
 const DEFAULT_PLATFORM_PROMPT =
-  'You are an AI agent working for {company_name}. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.'
+  'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.'
 
 export default function SettingsPrompt() {
   const { settings, updateSettings } = useStore()
@@ -59,7 +59,7 @@ export default function SettingsPrompt() {
             placeholder={DEFAULT_PLATFORM_PROMPT}
           />
           <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
-            Available variables: <code style={{ color: 'var(--subtle)' }}>{'{company_name}'}</code>, <code style={{ color: 'var(--subtle)' }}>{'{working_directory}'}</code>
+            Available variables: <code style={{ color: 'var(--subtle)' }}>{'{working_directory}'}</code>
           </p>
         </div>
 

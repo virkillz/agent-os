@@ -428,7 +428,7 @@ export function setSetting(key: string, value: string): void {
 }
 
 export function isFirstRun(): boolean {
-  return getSetting('company_name') === null
+  return (getDb().prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c === 0
 }
 
 // ── Row type definitions ──────────────────────────────────────────────────────

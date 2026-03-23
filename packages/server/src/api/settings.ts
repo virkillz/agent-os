@@ -64,33 +64,27 @@ function writeEnvFile(vars: Record<string, string>): void {
 export function createSettingsRouter(): Router {
   const router = Router()
 
-  // GET /api/settings — company info + first-run flag
+  // GET /api/settings — first-run flag + platform config
   router.get('/', (_req, res) => {
     const userCount = (getDb().prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c
     res.json({
-      firstRun: getSetting('company_name') === null,
+      firstRun: userCount === 0,
       needsSetup: userCount === 0,
-      companyName: getSetting('company_name') ?? '',
-      companyMission: getSetting('company_mission') ?? '',
       companyLogo: getSetting('company_logo') ?? '/rascals.png',
-      platformPrompt: getSetting('platform_prompt') ?? 'You are an AI agent working for {company_name}. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.',
+      platformPrompt: getSetting('platform_prompt') ?? 'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.',
       defaultModel: getSetting('default_model')
         ? JSON.parse(getSetting('default_model')!)
         : { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.5', thinkingLevel: 'low' },
     })
   })
 
-  // POST /api/settings — save company info
+  // POST /api/settings — save platform config
   router.post('/', (req, res) => {
-    const { companyName, companyMission, companyLogo, platformPrompt, defaultModel } = req.body as {
-      companyName?: string
-      companyMission?: string
+    const { companyLogo, platformPrompt, defaultModel } = req.body as {
       companyLogo?: string
       platformPrompt?: string
       defaultModel?: object
     }
-    if (companyName !== undefined) setSetting('company_name', companyName)
-    if (companyMission !== undefined) setSetting('company_mission', companyMission)
     if (companyLogo !== undefined) setSetting('company_logo', companyLogo)
     if (platformPrompt !== undefined) setSetting('platform_prompt', platformPrompt)
     if (defaultModel !== undefined) setSetting('default_model', JSON.stringify(defaultModel))

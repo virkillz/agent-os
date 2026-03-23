@@ -4,7 +4,7 @@ import { useStore } from '../store.ts'
 import { useAppEvents } from '../hooks/useAppEvents.ts'
 import type { Agent, CreateAgentInput } from '../api.ts'
 import { api } from '../api.ts'
-import { User, Bot, X, Plus } from 'lucide-react'
+import { User, Bot, X, Plus, ArrowLeft } from 'lucide-react'
 
 type HireMode = 'ai' | 'human'
 
@@ -23,9 +23,37 @@ export default function Roster() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-6 py-8">
+     
+      <div className="max-w-4xl mx-auto px-6 py-8 mt-20">
 
-        {/* ── Section Label ── */}
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-4">
+        {/* ── Back Button ── */}
+        <button
+          onClick={() => navigate('/')}
+          className="group flex items-center justify-center w-12 h-12 rounded-xl mb-6 transition-all duration-300"
+          style={{
+            background: 'rgba(12, 30, 50, 0.5)',
+            border: '1px solid rgba(100, 210, 230, 0.12)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(20, 60, 80, 0.6)'
+            e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.4)'
+            e.currentTarget.style.transform = 'translateX(-2px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(12, 30, 50, 0.5)'
+            e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.12)'
+            e.currentTarget.style.transform = 'translateX(0)'
+          }}
+        >
+          <ArrowLeft
+            size={24}
+            style={{ color: 'rgba(140, 200, 235, 0.8)' }}
+          />
+        </button>
+
+        {/* ── Page Title ── */}
         <div className="mb-6">
           <h1
             className="text-lg font-bold tracking-[0.15em] uppercase"
@@ -38,6 +66,7 @@ export default function Roster() {
               ? 'No agents yet — create your first one'
               : `${agents.length} agent${agents.length !== 1 ? 's' : ''} registered`}
           </p>
+        </div>
         </div>
 
         {/* ── Agent Tile Grid ── */}
@@ -275,7 +304,7 @@ function AgentTile({ agent, status, onClick }: {
             <img
               src={agent.avatar_url}
               alt={agent.name}
-              className="w-16 h-16 rounded-xl object-cover transition-all duration-300"
+              className="w-24 h-24 rounded-xl object-cover transition-all duration-300"
               style={{
                 border: '2px solid rgba(100, 210, 230, 0.12)',
                 filter: 'none',
@@ -283,7 +312,7 @@ function AgentTile({ agent, status, onClick }: {
             />
           ) : (
             <div
-              className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold transition-all duration-300"
+              className="w-24 h-24 rounded-xl flex items-center justify-center text-3xl font-bold transition-all duration-300"
               style={{
                 backgroundColor: 'rgba(100, 210, 230, 0.08)',
                 border: '2px solid rgba(100, 210, 230, 0.15)',
