@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
-import { getAgentMemory, getAgentTodos, getAgentRoles, getSetting, getAllAgents, getAgentChannels } from './db.js'
+import { getAgentMemory, getAgentTodos, getAgentRoles, getSetting, getAllAgents } from './db.js'
 import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
@@ -138,11 +138,6 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     ? `## Directory \n\n### Available Team Members\n${allAgents.map((a) => `- ${a.name} (id: ${a.id}) — ${a.role}`).join('\n')}`
     : ''
 
-  const channels = getAgentChannels(agent.id)
-  const channelsBlock = channels.length
-    ? `### Available Channels\n${channels.map((c: { id: string; name: string }) => `- #${c.name} (id: ${c.id})`).join('\n')}`
-    : ''
-
   // ── Build toolsBlock from active platform tool groups + plugins ───────────
   let agentToolIds: string[] = []
   let disabledToolIds: string[] = []
@@ -177,7 +172,7 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     `## How You Work\n\nAs a virtual employee, here is how you operate.\n\n` +
     toolSections.join('\n\n')
 
-  return [identityBlock, platformPrompt, roleBlock, sopBlock, toolsBlock, agentsBlock, channelsBlock, memoryBlock, todoBlock]
+  return [identityBlock, platformPrompt, roleBlock, sopBlock, toolsBlock, agentsBlock, memoryBlock, todoBlock]
     .filter(Boolean)
     .join('\n\n')
 }

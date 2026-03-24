@@ -264,31 +264,6 @@ function runMigrations(db: DB): void {
     CREATE INDEX IF NOT EXISTS idx_platform_messages_thread
       ON platform_messages(agent_id, platform, thread_id, created_at);
 
-    -- ── Channels + Messages ───────────────────────────────────────────────────
-
-    CREATE TABLE IF NOT EXISTS channels (
-      id         TEXT PRIMARY KEY,
-      name       TEXT NOT NULL UNIQUE,
-      is_dm      INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS channel_members (
-      channel_id  TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      member_id   TEXT NOT NULL,
-      member_type TEXT NOT NULL,
-      PRIMARY KEY (channel_id, member_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS channel_messages (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id  TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      sender_id   TEXT NOT NULL,
-      sender_type TEXT NOT NULL,
-      content     TEXT NOT NULL,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_channel_messages ON channel_messages(channel_id, created_at);
   `)
 
   // ── Trigger backfills for existing installs ──────────────────────────────
@@ -325,14 +300,6 @@ function runMigrations(db: DB): void {
 }
 
 function seedInitialData(db: DB): void {
-  // Seed #public channel if not present
-  let publicChannel = db.prepare("SELECT id FROM channels WHERE name = 'public'").get() as { id: string } | undefined
-  if (!publicChannel) {
-    const channelId = randomUUID()
-    db.prepare("INSERT INTO channels (id, name, is_dm) VALUES (?, 'public', 0)").run(channelId)
-    publicChannel = { id: channelId }
-  }
-
   // Seed default Tech Magazine roles if none exist
   const roleCount = (db.prepare('SELECT COUNT(*) as c FROM roles').get() as { c: number }).c
   if (roleCount === 0) {
@@ -424,13 +391,6 @@ You can read and modify source files to help with bug fixes, new features, and p
     }
   }
 
-  // Ensure all default agents are members of the public channel (must run after agent seeding)
-  const defaultAgents = db.prepare("SELECT id FROM agents WHERE name IN ('Fabiana', 'Clive')").all() as { id: string }[]
-  for (const agent of defaultAgents) {
-    db.prepare(
-      "INSERT OR IGNORE INTO channel_members (channel_id, member_id, member_type) VALUES (?, ?, 'agent')"
-    ).run(publicChannel.id, agent.id)
-  }
 }
 
 // ── Settings helpers ──────────────────────────────────────────────────────────
@@ -497,22 +457,6 @@ export interface RoleRow {
   name: string
   description: string
   prompt: string
-  created_at: string
-}
-
-export interface ChannelRow {
-  id: string
-  name: string
-  is_dm: number
-  created_at: string
-}
-
-export interface ChannelMessageRow {
-  id: number
-  channel_id: string
-  sender_id: string
-  sender_type: string
-  content: string
   created_at: string
 }
 
@@ -625,39 +569,10 @@ export function getAgentRoles(agentId: string): RoleRow[] {
     .all(agentId) as unknown as RoleRow[]
 }
 
-export function getAllChannels(): { id: string; name: string }[] {
-  return getDb()
-    .prepare("SELECT id, name FROM channels WHERE is_dm = 0 ORDER BY created_at ASC")
-    .all() as { id: string; name: string }[]
-}
-
-export function getAgentChannels(agentId: string): { id: string; name: string }[] {
-  return getDb()
-    .prepare(`
-      SELECT c.id, c.name FROM channels c
-      JOIN channel_members cm ON cm.channel_id = c.id
-      WHERE c.is_dm = 0 AND cm.member_id = ? AND cm.member_type = 'agent'
-      ORDER BY c.created_at ASC
-    `)
-    .all(agentId) as { id: string; name: string }[]
-}
-
 export function getAllAgents(): { id: string; name: string; role: string }[] {
   return getDb()
     .prepare('SELECT id, name, role FROM agents ORDER BY name ASC')
     .all() as { id: string; name: string; role: string }[]
-}
-
-export function getPublicChannelId(): string {
-  const row = getDb().prepare("SELECT id FROM channels WHERE name = 'public' AND is_dm = 0").get() as { id: string } | undefined
-  if (!row) throw new Error('#public channel not found — was the DB seeded?')
-  return row.id
-}
-
-export function getRecentChannelMessages(channelId: string, limit = 50): ChannelMessageRow[] {
-  return getDb()
-    .prepare('SELECT * FROM channel_messages WHERE channel_id = ? ORDER BY created_at DESC LIMIT ?')
-    .all(channelId, limit) as unknown as ChannelMessageRow[]
 }
 
 // ── Provider account helpers ──────────────────────────────────────────────────

@@ -20,8 +20,6 @@ export type AppEvent =
   | { type: 'plugin:configured'; pluginId: string }
   // Board events
   | { type: 'board:card_moved'; cardId: string; boardId: string; laneId: string; title: string }
-  // Channel events
-  | { type: 'channel:message'; channelId: string; senderId: string; senderType: string; senderName: string; content: string; messageId: number }
   // Chat events
   | { type: 'chat:message'; agentId: string; agentName: string; role: 'assistant'; content: string; messageId: number }
   // Notification events

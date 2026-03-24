@@ -9,10 +9,7 @@
 import { memoryTool } from './memory/index.js'
 import { todosTool } from './todos/index.js'
 // import { boardTool } from './board/index.js'
-import { channelsTool } from './channels/index.js'
-import { messagingTool } from './messaging/index.js'
 import { schedulingTool } from './scheduling/index.js'
-import { workspaceTool } from './workspace/index.js'
 import { agentMgmtTool } from './agent-mgmt/index.js'
 import { platformCommsTool } from './platform-comms/index.js'
 
@@ -20,10 +17,7 @@ export {
   memoryTool,
   todosTool,
   // boardTool,
-  channelsTool,
-  messagingTool,
   schedulingTool,
-  workspaceTool,
   agentMgmtTool,
   platformCommsTool,
 }
@@ -32,10 +26,7 @@ export const builtInPlatformTools = [
   memoryTool,
   todosTool,
   // boardTool,
-  channelsTool,
-  messagingTool,
   schedulingTool,
-  workspaceTool,
   agentMgmtTool,
   platformCommsTool,
 ]

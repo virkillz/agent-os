@@ -1,4 +1,6 @@
-import App from '@slack/bolt'
+import _bolt from '@slack/bolt'
+// @slack/bolt is CommonJS; destructure after the default import
+const { App } = _bolt as any
 import { randomUUID } from 'crypto'
 import chalk from 'chalk'
 import { getDb } from '../../db.js'
@@ -12,7 +14,7 @@ export class SlackConnector implements Connector {
   readonly agentId: string
 
   private config: SlackIntegrationConfig
-  private app: App
+  private app: InstanceType<typeof App>
   private botUserId: string | null = null
 
   constructor(agentId: string, config: SlackIntegrationConfig) {
@@ -37,7 +39,7 @@ export class SlackConnector implements Connector {
     }
 
     // DM handler — fires for all messages in DM channels
-    this.app.message(async ({ message }) => {
+    this.app.message(async ({ message }: { message: any }) => {
       try {
         // Only handle top-level user messages (no subtypes = normal message)
         if ('subtype' in message && message.subtype) return
@@ -50,7 +52,7 @@ export class SlackConnector implements Connector {
     })
 
     // @mention handler — fires when the bot is @mentioned in any channel
-    this.app.event('app_mention', async ({ event }) => {
+    this.app.event('app_mention', async ({ event }: { event: any }) => {
       try {
         await this.handleChannelMention(event as any)
       } catch (err) {

@@ -17,7 +17,6 @@ import { createPluginsRouter } from './api/plugins.js'
 import { createUsersRouter, createSetupRouter } from './api/users.js'
 import { createRolesRouter } from './api/roles.js'
 // import { createBoardsRouter } from './api/boards.js'
-import { createChannelsRouter } from './api/channels.js'
 import { createSkillsRouter } from './api/skills.js'
 import { createPlatformToolsRouter } from './api/platform-tools.js'
 import { createNotificationsRouter } from './api/notifications.js'
@@ -62,7 +61,6 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
   // ── New platform primitives ─────────────────────────────────────────────────
   app.use('/api/roles', createRolesRouter())
   // app.use('/api/boards', createBoardsRouter())
-  app.use('/api/channels', createChannelsRouter())
   app.use('/api/notifications', createNotificationsRouter())
   app.use('/api/provider-accounts', createProviderAccountsRouter())
   app.use('/api/agents', createTriggersRouter())
