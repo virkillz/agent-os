@@ -15,6 +15,7 @@
     "@mariozechner/pi-ai": "latest",
     "@mariozechner/pi-coding-agent": "latest",
     "@mozilla/readability": "^0.6.0",
+    "@slack/bolt": "^3.22.0",
     "@types/cookie-parser": "^1.4.10",
     "chalk": "^5.3.0",
     "cookie-parser": "^1.4.7",
@@ -24,6 +25,7 @@
     "express": "^4.19.2",
     "jsdom": "^29.0.1",
     "multer": "^2.1.1",
+    "telegraf": "^4.16.3",
     "ws": "^8.17.0"
   },
   "devDependencies": {

@@ -16,7 +16,7 @@ import { createWorkspaceRouter } from './api/workspace.js'
 import { createPluginsRouter } from './api/plugins.js'
 import { createUsersRouter, createSetupRouter } from './api/users.js'
 import { createRolesRouter } from './api/roles.js'
-import { createBoardsRouter } from './api/boards.js'
+// import { createBoardsRouter } from './api/boards.js'
 import { createChannelsRouter } from './api/channels.js'
 import { createSkillsRouter } from './api/skills.js'
 import { createPlatformToolsRouter } from './api/platform-tools.js'
@@ -61,7 +61,7 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
 
   // ── New platform primitives ─────────────────────────────────────────────────
   app.use('/api/roles', createRolesRouter())
-  app.use('/api/boards', createBoardsRouter())
+  // app.use('/api/boards', createBoardsRouter())
   app.use('/api/channels', createChannelsRouter())
   app.use('/api/notifications', createNotificationsRouter())
   app.use('/api/provider-accounts', createProviderAccountsRouter())
@@ -103,8 +103,6 @@ export function startServer(port: number, webDistDir?: string, workspaceDir?: st
       createNotification({ type: 'schedule', message: `Schedule fired for ${agentName(event.agentId)}: ${event.label || 'unnamed'}`, sourceEvent: 'schedule:fired', meta: { agentId: event.agentId, scheduleId: event.scheduleId } })
     } else if (event.type === 'schedule:created') {
       createNotification({ type: 'schedule', message: `${agentName(event.agentId)} created schedule: ${event.label || 'unnamed'}`, sourceEvent: 'schedule:created', meta: { agentId: event.agentId, scheduleId: event.scheduleId } })
-    } else if (event.type === 'board:card_moved') {
-      createNotification({ type: 'board', message: `Card moved: "${event.title}"`, sourceEvent: 'board:card_moved', meta: { cardId: event.cardId, boardId: event.boardId, laneId: event.laneId } })
     }
   })
 

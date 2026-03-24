@@ -10,8 +10,13 @@ import {
 } from '@mariozechner/pi-coding-agent'
 import path from 'path'
 import fs from 'fs'
+import { fileURLToPath } from 'url'
+
+// Built-in skills directory — skills placed here are available to all agents by default
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
-import { getAgentMemory, getAgentTodos, getAgentRoles, getSetting, getAllAgents, getBoardLanes, getAgentChannels } from './db.js'
+import { getAgentMemory, getAgentTodos, getAgentRoles, getSetting, getAllAgents, getAgentChannels } from './db.js'
 import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
@@ -127,15 +132,10 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     ? `## Your Open Todos\n${todos.map((t) => `[${t.id}] ${t.text}`).join('\n')}`
     : ''
 
-  // ── Static context: agents + lanes ───────────────────────────────────────
+  // ── Static context: agents + channels ────────────────────────────────────
   const allAgents = getAllAgents()
   const agentsBlock = allAgents.length
     ? `## Directory \n\n### Available Team Members\n${allAgents.map((a) => `- ${a.name} (id: ${a.id}) — ${a.role}`).join('\n')}`
-    : ''
-
-  const lanes = getBoardLanes()
-  const lanesBlock = lanes.length
-    ? `### Available Board Lanes\n${lanes.map((l) => `- ${l.name} (id: ${l.id}, type: ${l.type})`).join('\n')}`
     : ''
 
   const channels = getAgentChannels(agent.id)
@@ -177,7 +177,7 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     `## How You Work\n\nAs a virtual employee, here is how you operate.\n\n` +
     toolSections.join('\n\n')
 
-  return [identityBlock, platformPrompt, roleBlock, sopBlock, toolsBlock, agentsBlock, lanesBlock, channelsBlock, memoryBlock, todoBlock]
+  return [identityBlock, platformPrompt, roleBlock, sopBlock, toolsBlock, agentsBlock, channelsBlock, memoryBlock, todoBlock]
     .filter(Boolean)
     .join('\n\n')
 }
@@ -247,6 +247,8 @@ async function createLiveSession(
     systemPromptOverride: () => systemPrompt,
     agentsFilesOverride: () => ({ agentsFiles: [] }),
     appendSystemPromptOverride: () => [],
+    // Inject built-in skills so they're available to all agents by default
+    additionalSkillPaths: [BUILTIN_SKILLS_DIR],
     ...(allowedSkills && {
       skillsOverride: (base) => ({
         ...base,
@@ -414,17 +416,31 @@ export function clearSession(agentId: string): void {
   liveSessions.delete(agentId)
 }
 
+export interface InvokeAgentOpts {
+  /**
+   * Extra text appended to the base system prompt (after a blank line).
+   * Used by platform connectors to inject trigger context + conversation history.
+   */
+  systemPromptAddendum?: string
+  /**
+   * When true, the prompt is passed to the session as-is without the
+   * scheduler "Now your current task is:" wrapper.
+   * Platform (Slack/Telegram) invocations should set this to true.
+   */
+  rawPrompt?: boolean
+}
+
 /**
  * Unified invocation entry point — runs a fresh isolated session for any
  * non-interactive trigger (scheduler, Slack, Telegram, etc.).
- * Identical to runScheduledTask but named to match the design vocabulary.
  */
 export async function invokeAgent(
   agent: AgentRecord,
   prompt: string,
   defaultModel: ModelConfig,
+  opts?: InvokeAgentOpts,
 ): Promise<string> {
-  return runScheduledTask(agent, prompt, defaultModel)
+  return runScheduledTask(agent, prompt, defaultModel, opts)
 }
 
 /**
@@ -435,11 +451,17 @@ export async function runScheduledTask(
   agent: AgentRecord,
   taskPrompt: string,
   defaultModel: ModelConfig,
+  opts?: InvokeAgentOpts,
 ): Promise<string> {
   const workspaceDir = resolveWorkspaceDir()
   ensureSopFile(workspaceDir)
-  const systemPrompt = buildSystemPrompt(agent, workspaceDir)
-  const userMessage = `------------------------\nNow your current task is:\n${taskPrompt}`
+  const baseSystemPrompt = buildSystemPrompt(agent, workspaceDir)
+  const systemPrompt = opts?.systemPromptAddendum
+    ? `${baseSystemPrompt}\n\n${opts.systemPromptAddendum}`
+    : baseSystemPrompt
+  const userMessage = opts?.rawPrompt
+    ? taskPrompt
+    : `------------------------\nNow your current task is:\n${taskPrompt}`
 
   const live = await createLiveSession(agent, defaultModel, systemPrompt)
 

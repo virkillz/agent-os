@@ -2,6 +2,61 @@ import chalk from 'chalk'
 import { getDb, getSetting, type InvocationQueueRow } from './db.js'
 import { invokeAgent, isDebugMode, type AgentRecord, type ModelConfig } from './agent-runner.js'
 import { eventBus } from './event-bus.js'
+import { connectorLoader } from './connectors/loader.js'
+import { buildSlackContextAddendum, buildConversationHistoryBlock, type SlackTriggerMeta } from './connectors/slack/context.js'
+import { buildTelegramContextAddendum, type TelegramTriggerMeta } from './connectors/telegram/context.js'
+
+// ── Platform trigger context ───────────────────────────────────────────────
+
+type PlatformTriggerContext = SlackTriggerMeta | TelegramTriggerMeta
+
+function buildPlatformAddendum(
+  ctx: PlatformTriggerContext,
+  agentId: string,
+  historyWindow: number,
+): string {
+  const db = getDb()
+
+  // Build trigger context addendum text
+  const contextText = ctx.platform === 'telegram'
+    ? buildTelegramContextAddendum(ctx)
+    : buildSlackContextAddendum(ctx)
+
+  // Fetch conversation history from platform_messages
+  const rows = db.prepare(`
+    SELECT sender_name, sender_type, content, created_at
+    FROM platform_messages
+    WHERE agent_id = ?
+      AND platform = ?
+      AND scope_id = ?
+      AND (
+        (? IS NOT NULL AND thread_id = ?)
+        OR (? IS NULL AND thread_id IS NULL)
+      )
+    ORDER BY created_at ASC
+    LIMIT ?
+  `).all(
+    agentId, ctx.platform, ctx.scopeId,
+    ctx.threadId, ctx.threadId,
+    ctx.threadId,
+    historyWindow,
+  ) as { sender_name: string; sender_type: string; content: string; created_at: string }[]
+
+  let historyLabel: string
+  if (ctx.platform === 'telegram') {
+    historyLabel = ctx.scopeType === 'dm'
+      ? 'Telegram DM'
+      : `Telegram ${ctx.groupTitle ? ctx.groupTitle : ctx.scopeId}`
+  } else {
+    historyLabel = ctx.scopeType === 'dm'
+      ? 'Slack DM'
+      : `Slack ${ctx.channelName ? '#' + ctx.channelName : ctx.scopeId}`
+  }
+
+  const historyText = buildConversationHistoryBlock(rows, historyLabel)
+
+  return [contextText, historyText].filter(Boolean).join('\n\n')
+}
 
 function getDefaultModel(): ModelConfig {
   const stored = getSetting('default_model')
@@ -40,7 +95,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
     return
   }
 
-  let payload: { prompt: string }
+  let payload: { prompt: string; triggerContext?: PlatformTriggerContext }
   try {
     payload = JSON.parse(row.payload)
   } catch {
@@ -53,8 +108,37 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
     console.log(chalk.cyan('[queue-worker]'), chalk.bold('processing'), `queueId=${row.id}`, `agent=${agent.name}`, `type=${row.trigger_type}`)
   }
 
+  // Build platform addendum (trigger context + conversation history) if this is a platform invocation
+  const ctx = payload.triggerContext
+  const historyWindow = 20  // TODO: read from integration config
+  const systemPromptAddendum = ctx ? buildPlatformAddendum(ctx, row.agent_id, historyWindow) : undefined
+
   try {
-    await invokeAgent(agent, payload.prompt, getDefaultModel())
+    const response = await invokeAgent(agent, payload.prompt, getDefaultModel(), {
+      systemPromptAddendum,
+      rawPrompt: ctx !== undefined,
+    })
+
+    // Store outbound platform message and deliver via connector
+    if (ctx) {
+      db.prepare(`
+        INSERT OR IGNORE INTO platform_messages
+          (agent_id, platform, message_type, direction, scope_type, scope_id, thread_id,
+           sender_id, sender_name, sender_type, content)
+        VALUES (?, ?, 'message', 'outbound', ?, ?, ?, ?, ?, 'agent', ?)
+      `).run(
+        row.agent_id, ctx.platform,
+        ctx.scopeType, ctx.scopeId, ctx.threadId,
+        row.agent_id, agent.name, response,
+      )
+
+      const connector = connectorLoader.getConnector(row.agent_id, ctx.platform)
+      if (connector) {
+        await connector.sendMessage(ctx.scopeId, ctx.threadId, response)
+      } else {
+        console.warn(chalk.yellow('[queue-worker]'), `no active connector for ${ctx.platform}, agent ${row.agent_id}`)
+      }
+    }
 
     // Mark done
     db.prepare("UPDATE invocation_queue SET status = 'done', processed_at = datetime('now') WHERE id = ?").run(row.id)
@@ -101,9 +185,13 @@ export function enqueueInvocation(opts: {
   triggerId: string | null
   triggerType: string
   prompt: string
+  triggerContext?: PlatformTriggerContext
 }): number {
   const db = getDb()
-  const payload = JSON.stringify({ prompt: opts.prompt })
+  const payload = JSON.stringify({
+    prompt: opts.prompt,
+    ...(opts.triggerContext ? { triggerContext: opts.triggerContext } : {}),
+  })
   const result = db.prepare(
     'INSERT INTO invocation_queue (agent_id, trigger_id, trigger_type, payload) VALUES (?, ?, ?, ?)'
   ).run(opts.agentId, opts.triggerId, opts.triggerType, payload) as { lastInsertRowid: number | bigint }

@@ -327,6 +327,8 @@ export const api = {
   triggers: {
     list: (agentId: string) =>
       req<Trigger[]>('GET', `/agents/${agentId}/triggers`),
+    queueSummary: (agentId: string) =>
+      req<{ pending: number; processing: number; done: number; failed: number }>('GET', `/agents/${agentId}/invocations/summary`),
     patch: (agentId: string, triggerId: string, data: { enabled: number }) =>
       req<Trigger>('PATCH', `/agents/${agentId}/triggers/${triggerId}`, data),
     delete: (agentId: string, triggerId: string) =>
@@ -620,6 +622,8 @@ export interface Integration {
   enabled: number
   created_at: string
   updated_at: string
+  status?: 'running' | 'stopped' | 'error'
+  error?: string
 }
 
 export interface PlatformMessage {

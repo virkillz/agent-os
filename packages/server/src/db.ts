@@ -142,63 +142,6 @@ function runMigrations(db: DB): void {
       configured   INTEGER NOT NULL DEFAULT 0
     );
 
-    -- ── Kanban Boards ─────────────────────────────────────────────────────────
-
-    CREATE TABLE IF NOT EXISTS boards (
-      id         TEXT PRIMARY KEY,
-      name       TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS lanes (
-      id          TEXT PRIMARY KEY,
-      board_id    TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-      name        TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      position    INTEGER NOT NULL DEFAULT 0,
-      lane_type   TEXT NOT NULL DEFAULT 'in_progress'
-    );
-
-    CREATE TABLE IF NOT EXISTS cards (
-      id              TEXT PRIMARY KEY,
-      board_id        TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-      lane_id         TEXT NOT NULL REFERENCES lanes(id),
-      title           TEXT NOT NULL,
-      description     TEXT NOT NULL DEFAULT '',
-      result          TEXT NOT NULL DEFAULT '',
-      assignee_id     TEXT,
-      assignee_type   TEXT,
-      created_by      TEXT NOT NULL,
-      created_by_type TEXT NOT NULL,
-      position        INTEGER NOT NULL DEFAULT 0,
-      is_archived     INTEGER NOT NULL DEFAULT 0,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_cards_board ON cards(board_id, lane_id);
-
-    -- Lane movement rules: who can move cards INTO this lane.
-    -- No rules = anyone can move. rule_type: 'admin_only' | 'role' | 'employee'
-    CREATE TABLE IF NOT EXISTS lane_rules (
-      id        TEXT PRIMARY KEY,
-      lane_id   TEXT NOT NULL REFERENCES lanes(id) ON DELETE CASCADE,
-      rule_type TEXT NOT NULL,
-      target_id TEXT
-    );
-
-    -- Card activity log: immutable record of every card action.
-    -- card_id is intentionally not a FK so events survive card deletion.
-    CREATE TABLE IF NOT EXISTS card_events (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      card_id    TEXT    NOT NULL,
-      board_id   TEXT    NOT NULL,
-      actor_id   TEXT    NOT NULL,
-      actor_type TEXT    NOT NULL,
-      action     TEXT    NOT NULL,
-      meta       TEXT    NOT NULL DEFAULT '{}',
-      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_card_events_card ON card_events(card_id, created_at);
 
     -- ── Notifications ─────────────────────────────────────────────────────────
 
@@ -378,26 +321,7 @@ function runMigrations(db: DB): void {
   db.exec(`UPDATE agents SET is_default = 1 WHERE name IN ('Fabiana', 'Clive') AND is_default = 0`)
   addColumnIfNotExists(db, 'users', 'avatar_url', "TEXT NOT NULL DEFAULT ''")
   addColumnIfNotExists(db, 'users', 'bio', "TEXT NOT NULL DEFAULT ''")
-  addColumnIfNotExists(db, 'cards', 'result', "TEXT NOT NULL DEFAULT ''")
-  addColumnIfNotExists(db, 'cards', 'is_archived', 'INTEGER NOT NULL DEFAULT 0')
-  addColumnIfNotExists(db, 'lanes', 'lane_type', "TEXT NOT NULL DEFAULT 'in_progress'")
-  addColumnIfNotExists(db, 'lanes', 'description', "TEXT NOT NULL DEFAULT ''")
   addColumnIfNotExists(db, 'agents', 'account_id', 'TEXT')
-
-  // Assign lane types to existing boards that have none set yet.
-  // For each board where all lanes are still 'in_progress' (i.e. fresh migration),
-  // set the first lane (min position) to 'todo' and the last (max position) to 'done'.
-  const untypedBoards = db.prepare(`
-    SELECT DISTINCT board_id FROM lanes
-    WHERE board_id NOT IN (
-      SELECT DISTINCT board_id FROM lanes WHERE lane_type != 'in_progress'
-    )
-  `).all() as { board_id: string }[]
-  for (const { board_id } of untypedBoards) {
-    const lns = db.prepare('SELECT id FROM lanes WHERE board_id = ? ORDER BY position ASC').all(board_id) as { id: string }[]
-    if (lns.length >= 1) db.prepare("UPDATE lanes SET lane_type = 'todo' WHERE id = ?").run(lns[0].id)
-    if (lns.length >= 2) db.prepare("UPDATE lanes SET lane_type = 'done' WHERE id = ?").run(lns[lns.length - 1].id)
-  }
 }
 
 function seedInitialData(db: DB): void {
@@ -407,22 +331,6 @@ function seedInitialData(db: DB): void {
     const channelId = randomUUID()
     db.prepare("INSERT INTO channels (id, name, is_dm) VALUES (?, 'public', 0)").run(channelId)
     publicChannel = { id: channelId }
-  }
-
-  // Seed default board if none exist
-  const boardCount = (db.prepare('SELECT COUNT(*) as c FROM boards').get() as { c: number }).c
-  if (boardCount === 0) {
-    const boardId = randomUUID()
-    db.prepare("INSERT INTO boards (id, name) VALUES (?, 'Main Board')").run(boardId)
-    const lanes: { name: string; description: string; type: 'todo' | 'in_progress' | 'done' }[] = [
-      { name: 'Todo', description: 'Tasks ready to be picked up', type: 'todo' },
-      { name: 'Doing', description: 'Tasks currently being worked on', type: 'in_progress' },
-      { name: 'Done', description: 'Completed tasks', type: 'done' },
-    ]
-    lanes.forEach(({ name, description, type }, i) => {
-      db.prepare('INSERT INTO lanes (id, board_id, name, description, position, lane_type) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(randomUUID(), boardId, name, description, i, type)
-    })
   }
 
   // Seed default Tech Magazine roles if none exist
@@ -592,56 +500,6 @@ export interface RoleRow {
   created_at: string
 }
 
-export interface BoardRow {
-  id: string
-  name: string
-  created_at: string
-}
-
-export interface LaneRow {
-  id: string
-  board_id: string
-  name: string
-  description: string
-  position: number
-  lane_type: 'todo' | 'in_progress' | 'done'
-}
-
-export interface CardRow {
-  id: string
-  board_id: string
-  lane_id: string
-  title: string
-  description: string
-  result: string
-  assignee_id: string | null
-  assignee_type: string | null
-  created_by: string
-  created_by_type: string
-  position: number
-  is_archived: number
-  created_at: string
-  updated_at: string
-}
-
-export interface CardEventRow {
-  id: number
-  card_id: string
-  board_id: string
-  actor_id: string
-  actor_type: string
-  action: string
-  meta: string
-  created_at: string
-}
-
-export interface LaneRuleRow {
-  id: string
-  lane_id: string
-  rule_type: string
-  target_id: string | null
-}
-
 export interface ChannelRow {
   id: string
   name: string
@@ -788,15 +646,6 @@ export function getAllAgents(): { id: string; name: string; role: string }[] {
   return getDb()
     .prepare('SELECT id, name, role FROM agents ORDER BY name ASC')
     .all() as { id: string; name: string; role: string }[]
-}
-
-export function getBoardLanes(): { id: string; name: string; type: string }[] {
-  const db = getDb()
-  const board = db.prepare('SELECT id FROM boards ORDER BY created_at ASC LIMIT 1').get() as { id: string } | undefined
-  if (!board) return []
-  return db
-    .prepare('SELECT id, name, lane_type AS type FROM lanes WHERE board_id = ? ORDER BY position ASC')
-    .all(board.id) as { id: string; name: string; type: string }[]
 }
 
 export function getPublicChannelId(): string {

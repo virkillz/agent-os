@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { getDb, type AgentIntegrationRow, type PlatformMessageRow } from '../db.js'
 import { eventBus } from '../event-bus.js'
+import { connectorLoader } from '../connectors/loader.js'
 
 // Mask sensitive token fields in config before sending to client
 function maskConfig(platform: string, rawConfig: string): Record<string, unknown> {
@@ -30,6 +31,7 @@ export function createIntegrationsRouter(): Router {
     res.json(rows.map((r) => ({
       ...r,
       config: maskConfig(r.platform, r.config),
+      ...connectorLoader.statusOf(r.agent_id, r.platform),
     })))
   })
 
@@ -62,7 +64,7 @@ export function createIntegrationsRouter(): Router {
       .get(req.params.id, platform) as unknown as AgentIntegrationRow
 
     eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform })
-    res.status(201).json({ ...created, config: maskConfig(platform, created.config) })
+    res.status(201).json({ ...created, config: maskConfig(platform, created.config), ...connectorLoader.statusOf(req.params.id, platform) })
   })
 
   // GET /api/agents/:id/integrations/:iid
@@ -106,7 +108,7 @@ export function createIntegrationsRouter(): Router {
       .get(row.id) as unknown as AgentIntegrationRow
 
     eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform: updated.platform })
-    res.json({ ...updated, config: maskConfig(updated.platform, updated.config) })
+    res.json({ ...updated, config: maskConfig(updated.platform, updated.config), ...connectorLoader.statusOf(req.params.id, updated.platform) })
   })
 
   // DELETE /api/agents/:id/integrations/:iid

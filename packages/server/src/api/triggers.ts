@@ -126,6 +126,16 @@ export function createTriggersRouter(): Router {
     })
   })
 
+  // GET /api/agents/:id/invocations/summary — queue status counts for this agent
+  router.get('/:id/invocations/summary', (req, res) => {
+    const rows = getDb()
+      .prepare('SELECT status, COUNT(*) as count FROM invocation_queue WHERE agent_id = ? GROUP BY status')
+      .all(req.params.id) as { status: string; count: number }[]
+    const summary: Record<string, number> = { pending: 0, processing: 0, done: 0, failed: 0 }
+    for (const r of rows) summary[r.status] = (r.count as number)
+    res.json(summary)
+  })
+
   // GET /api/agents/:id/triggers/:tid/invocations — recent invocations for this trigger
   router.get('/:id/triggers/:tid/invocations', (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 20, 100)

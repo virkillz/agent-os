@@ -1,7 +1,9 @@
 import chalk from 'chalk'
 import { getDb, type AgentIntegrationRow } from '../db.js'
 import { eventBus } from '../event-bus.js'
-import type { Connector } from './types.js'
+import type { Connector, SlackIntegrationConfig, TelegramIntegrationConfig } from './types.js'
+import { SlackConnector } from './slack/index.js'
+import { TelegramConnector } from './telegram/index.js'
 
 /**
  * ConnectorLoader manages the lifecycle of all platform connectors.
@@ -14,6 +16,8 @@ import type { Connector } from './types.js'
 class ConnectorLoader {
   // Map of "agentId:platform" → active Connector
   private active = new Map<string, Connector>()
+  // Map of "agentId:platform" → last error message (set on failed start, cleared on success)
+  private errors = new Map<string, string>()
 
   private key(agentId: string, platform: string): string {
     return `${agentId}:${platform}`
@@ -51,10 +55,12 @@ class ConnectorLoader {
     try {
       await connector.start()
       this.active.set(k, connector)
+      this.errors.delete(k)
       eventBus.emit({ type: 'connector:started', agentId: row.agent_id, platform: row.platform })
       console.log(chalk.green('[connector]'), `started ${row.platform} for agent ${row.agent_id}`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      this.errors.set(k, msg)
       eventBus.emit({ type: 'connector:error', agentId: row.agent_id, platform: row.platform, error: msg })
       console.error(chalk.red('[connector]'), `failed to start ${row.platform} for agent ${row.agent_id}:`, msg)
     }
@@ -96,15 +102,53 @@ class ConnectorLoader {
   }
 
   /**
-   * Instantiate the right Connector class for a given integration row.
-   * Returns null for platforms not yet implemented (Phase 3/4).
+   * Returns the connector status for a given agent+platform.
+   * Used by the integrations API to surface health state to the frontend.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private buildConnector(_row: AgentIntegrationRow): Connector | null {
-    // Phase 3 will return: new SlackConnector(row.agent_id, config)
-    // Phase 4 will return: new TelegramConnector(row.agent_id, config)
-    // For now, log a warning and return null
-    console.log(chalk.dim('[connector]'), `${_row.platform} connector not yet implemented — skipping`)
+  statusOf(agentId: string, platform: string): { status: 'running' | 'stopped' | 'error'; error?: string } {
+    const k = this.key(agentId, platform)
+    if (this.active.has(k)) return { status: 'running' }
+    const err = this.errors.get(k)
+    if (err) return { status: 'error', error: err }
+    return { status: 'stopped' }
+  }
+
+  /**
+   * Instantiate the right Connector class for a given integration row.
+   * Returns null for platforms not yet implemented (Phase 4+).
+   */
+  private buildConnector(row: AgentIntegrationRow): Connector | null {
+    if (row.platform === 'slack') {
+      let config: SlackIntegrationConfig
+      try {
+        config = JSON.parse(row.config) as SlackIntegrationConfig
+      } catch {
+        console.error(chalk.red('[connector]'), `invalid Slack config JSON for agent ${row.agent_id}`)
+        return null
+      }
+      if (!config.app_token || !config.bot_token) {
+        console.warn(chalk.yellow('[connector]'), `Slack integration for agent ${row.agent_id} missing app_token or bot_token — skipping`)
+        return null
+      }
+      return new SlackConnector(row.agent_id, config)
+    }
+
+    if (row.platform === 'telegram') {
+      let config: TelegramIntegrationConfig
+      try {
+        config = JSON.parse(row.config) as TelegramIntegrationConfig
+      } catch {
+        console.error(chalk.red('[connector]'), `invalid Telegram config JSON for agent ${row.agent_id}`)
+        return null
+      }
+      if (!config.bot_token) {
+        console.warn(chalk.yellow('[connector]'), `Telegram integration for agent ${row.agent_id} missing bot_token — skipping`)
+        return null
+      }
+      return new TelegramConnector(row.agent_id, config)
+    }
+
+    console.log(chalk.dim('[connector]'), `${row.platform} connector not yet implemented — skipping`)
     return null
   }
 }
