@@ -77,11 +77,15 @@ export default function SettingsRoles() {
               key={role.id}
               onClick={() => selectRole(role)}
               className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 ${
-                selected?.id === role.id ? 'bg-surface-3' : 'hover:bg-surface-2'
+                selected?.id === role.id ? '' : 'hover:bg-white/5'
               }`}
-              style={{ color: selected?.id === role.id ? 'var(--text-primary)' : 'var(--muted)' }}
+              style={{
+                color: selected?.id === role.id ? '#e8f4f8' : 'var(--muted)',
+                background: selected?.id === role.id ? 'rgba(100, 210, 230, 0.08)' : undefined,
+                borderLeft: `2px solid ${selected?.id === role.id ? 'rgba(100, 210, 230, 0.6)' : 'transparent'}`,
+              }}
             >
-              <div className="w-2 h-2 rounded-full bg-accent/60 flex-shrink-0" />
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'rgba(100, 210, 230, 0.5)' }} />
               <span className="truncate">{role.name}</span>
             </button>
           ))}
@@ -129,7 +133,7 @@ export default function SettingsRoles() {
                     <button
                       onClick={save}
                       disabled={saving}
-                      className="px-3 py-1.5 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
+                      className="btn-primary px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
                     >
                       {saving ? 'Saving…' : 'Save'}
                     </button>
@@ -198,7 +202,7 @@ export default function SettingsRoles() {
             <p className="text-sm" style={{ color: 'var(--muted)' }}>Select a role or create a new one</p>
             <button
               onClick={startCreate}
-              className="px-4 py-2 bg-accent text-white text-sm rounded-lg hover:bg-accent-hover transition-colors"
+              className="btn-primary text-sm rounded-lg"
             >
               New Role
             </button>

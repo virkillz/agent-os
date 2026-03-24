@@ -70,7 +70,7 @@ export function createSettingsRouter(): Router {
     res.json({
       firstRun: userCount === 0,
       needsSetup: userCount === 0,
-      companyLogo: getSetting('company_logo') ?? '/rascals.png',
+      companyLogo: getSetting('company_logo') ?? '/agentos.png',
       platformPrompt: getSetting('platform_prompt') ?? 'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.',
       defaultModel: getSetting('default_model')
         ? JSON.parse(getSetting('default_model')!)

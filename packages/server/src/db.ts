@@ -17,7 +17,7 @@ export function getDb(): DB {
 
 export function initDb(dataDir: string): DB {
   fs.mkdirSync(dataDir, { recursive: true })
-  const dbPath = path.join(dataDir, 'rascal.db')
+  const dbPath = path.join(dataDir, 'agentos.db')
   _db = new DatabaseSync(dbPath)
   runMigrations(_db)
   seedInitialData(_db)
@@ -345,21 +345,21 @@ function seedInitialData(db: DB): void {
         role: 'Assistant',
         description: 'Your general-purpose assistant, ready to help with any task.',
         system_prompt: 'You are Fabiana, a warm and capable assistant. You are helpful, clear, and proactive. You adapt to whatever the user needs — research, writing, planning, or just thinking things through together. Always address the human as "Chief".\n\nYou can hire new agents for the team using the `create_agent` tool. When the Chief needs a specialist — a copywriter, analyst, developer, or any other role — you can create them on the spot. Give each new agent a fitting name, a clear role, and a system prompt that defines their expertise and personality.',
-        avatar_url: '/default_avatar/avatar_4.jpg',
+        avatar_url: '/robots/avatar_4.jpg',
         avatar_color: '#f7a26a',
       },
       {
         name: 'Clive',
         role: 'Tech Support',
         description: 'Your technical expert — can read, modify, and extend the platform source code.',
-        system_prompt: `You are Clive, the Tech Support agent for this platform. You have full access to the rascal-inc source code located at {project_dir}.
+        system_prompt: `You are Clive, the Tech Support agent for this platform. You have full access to the agentos source code located at {project_dir}.
 
 The codebase is a Node.js monorepo:
 - {project_dir}/packages/server — Express + SQLite backend (port 3000)
 - {project_dir}/packages/web — React + Vite frontend (port 5173)
 
 You can read and modify source files to help with bug fixes, new features, and plugin development. Use the bash and file tools to navigate and edit the codebase. Always test your understanding of the code before making changes, and explain what you're doing. Always address the human as "Chief".`,
-        avatar_url: '/default_avatar/avatar_13.jpg',
+        avatar_url: '/robots/avatar_13.jpg',
         avatar_color: '#6ab5f7',
       },
     ]
@@ -373,21 +373,6 @@ You can read and modify source files to help with bug fixes, new features, and p
       db.prepare(
         "INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label) VALUES (lower(hex(randomblob(16))), ?, 'internal_chat', 'Web UI Chat')"
       ).run(agentId)
-
-      // Seed group chat monitoring schedule for each default agent
-      const schedResult = db.prepare(
-        'INSERT INTO agent_schedules (agent_id, cron, prompt, label, enabled) VALUES (?, ?, ?, ?, 1)',
-      ).run(
-        agentId,
-        '*/15 * * * *',
-        'Check the public channel, and decide if you want to post something. You can decide to post or not.',
-        'Public channel monitoring',
-      ) as { lastInsertRowid: number | bigint }
-
-      // Auto-insert scheduler trigger for this schedule
-      db.prepare(
-        "INSERT OR IGNORE INTO agent_triggers (id, agent_id, type, label, source_id) VALUES (lower(hex(randomblob(16))), ?, 'scheduler', 'Public channel monitoring', ?)"
-      ).run(agentId, String(schedResult.lastInsertRowid))
     }
   }
 

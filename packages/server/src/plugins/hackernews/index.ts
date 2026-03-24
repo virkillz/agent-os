@@ -1,5 +1,5 @@
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin } from '../types.js'
+import type { AgentOSPlugin } from '../types.js'
 
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
@@ -17,7 +17,7 @@ interface HNStory {
 async function fetchHNPage(page = 1): Promise<HNStory[]> {
   const url = `https://news.ycombinator.com/news${page > 1 ? `?p=${page}` : ''}`
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; rascal-bot/1.0)' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; agentos-bot/1.0)' },
   })
   if (!response.ok) throw new Error(`Failed to fetch HN: ${response.status}`)
 
@@ -97,7 +97,7 @@ async function fetchHNComments(itemId: string): Promise<string> {
   return lines.join('\n\n') || 'No readable comments found.'
 }
 
-export const hackernewsPlugin: RascalPlugin = {
+export const hackernewsPlugin: AgentOSPlugin = {
   config: {
     id: 'hackernews',
     displayName: 'Hacker News',

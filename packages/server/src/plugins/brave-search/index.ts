@@ -1,11 +1,11 @@
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin } from '../types.js'
+import type { AgentOSPlugin } from '../types.js'
 
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
 }
 
-export const braveSearchPlugin: RascalPlugin = {
+export const braveSearchPlugin: AgentOSPlugin = {
   config: {
     id: 'brave-search',
     displayName: 'Brave Search',

@@ -19,7 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const command = process.argv[2]
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
 
-// Company directory: where rascal was started from (or explicit --dir flag)
+// Company directory: where agentos was started from (or explicit --dir flag)
 const dirFlag = process.argv.indexOf('--dir')
 const companyDir = dirFlag !== -1 ? path.resolve(process.argv[dirFlag + 1]) : process.cwd()
 
@@ -29,11 +29,11 @@ if (debugFlag) setDebugMode(true)
 const DATA_DIR = path.join(companyDir, 'data')
 const WORKSPACE_DIR = path.join(DATA_DIR, 'workspace')
 const ENV_FILE = path.join(companyDir, '.env')
-const CONFIG_FILE = path.join(companyDir, 'rascal.json')
+const CONFIG_FILE = path.join(companyDir, 'agentos.json')
 
 function printBanner() {
   console.log('')
-  console.log(chalk.bold.white('  rascal-inc'))
+  console.log(chalk.bold.white('  agentos'))
   console.log(chalk.dim('  virtual company platform'))
   console.log('')
 }
@@ -43,7 +43,7 @@ async function cmdInit() {
 
   if (fs.existsSync(CONFIG_FILE)) {
     console.log(chalk.yellow('  Already initialized in this directory.'))
-    console.log(chalk.dim(`  Run ${chalk.white('rascal start')} to launch.\n`))
+    console.log(chalk.dim(`  Run ${chalk.white('agentos start')} to launch.\n`))
     return
   }
 
@@ -65,7 +65,7 @@ async function cmdInit() {
   console.log(`  ${chalk.dim('data')}      ${DATA_DIR}`)
   console.log(`  ${chalk.dim('workspace')} ${WORKSPACE_DIR}`)
   console.log('')
-  console.log(`  Run ${chalk.white('rascal start')} to launch.\n`)
+  console.log(`  Run ${chalk.white('agentos start')} to launch.\n`)
 }
 
 async function cmdStart() {
@@ -127,6 +127,6 @@ switch (command) {
   default:
     printBanner()
     console.log('  Usage:')
-    console.log('    rascal init    Initialize a new company directory')
-    console.log('    rascal start   Start the server\n')
+    console.log('    agentos init    Initialize a new company directory')
+    console.log('    agentos start   Start the server\n')
 }

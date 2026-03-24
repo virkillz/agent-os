@@ -26,7 +26,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 // ── Session helpers ───────────────────────────────────────────────────────────
 
-const SESSION_COOKIE = 'rascal_session'
+const SESSION_COOKIE = 'agentos_session'
 
 export function createSession(userId: string): string {
   const token = randomUUID()

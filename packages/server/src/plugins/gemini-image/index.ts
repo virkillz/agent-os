@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin, ToolContext } from '../types.js'
+import type { AgentOSPlugin, ToolContext } from '../types.js'
 
 const IMAGEN_MODEL = 'imagen-3.0-generate-001'
 
@@ -9,7 +9,7 @@ function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
 }
 
-export const geminiImagePlugin: RascalPlugin = {
+export const geminiImagePlugin: AgentOSPlugin = {
   config: {
     id: 'gemini-image',
     displayName: 'Gemini Image',

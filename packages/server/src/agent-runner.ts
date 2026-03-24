@@ -9,14 +9,13 @@ import {
   type AgentSessionEvent,
 } from '@mariozechner/pi-coding-agent'
 import path from 'path'
-import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 // Built-in skills directory — skills placed here are available to all agents by default
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
-import { getAgentMemory, getAgentTodos, getAgentRoles, getSetting, getAllAgents } from './db.js'
+import { getAgentMemory, getAgentTodos, getAgentRoles, getAllAgents } from './db.js'
 import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
@@ -85,30 +84,8 @@ export function resolveSessionsDir(agentId: string): string {
   return path.join(dataDir, 'sessions', agentId)
 }
 
-const DEFAULT_SOP = ``
-
-function ensureSopFile(workspaceDir: string): void {
-  fs.mkdirSync(workspaceDir, { recursive: true })
-  const sopPath = path.join(workspaceDir, 'SOP.md')
-  if (!fs.existsSync(sopPath)) {
-    fs.writeFileSync(sopPath, DEFAULT_SOP, 'utf-8')
-  }
-}
-
 export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): string {
-  // ── Layer 1: Platform prompt ─────────────────────────────────────────────
-  const rawPlatformPrompt = getSetting('platform_prompt') ??
-    'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.'
-  const platformPrompt = rawPlatformPrompt
-    .replace('{working_directory}', workspaceDir)
-
-  // ── Layer 2: SOP.md ──────────────────────────────────────────────────────
-  const sopPath = path.join(workspaceDir, 'SOP.md')
-  const sopBlock = fs.existsSync(sopPath)
-    ? `## Standard Operating Procedure\n${fs.readFileSync(sopPath, 'utf-8').trim()}`
-    : ''
-
-  // ── Layer 3: Role prompts ────────────────────────────────────────────────
+  // ── Layer 1: Role prompts ────────────────────────────────────────────────
   const roles = getAgentRoles(agent.id)
   const roleBlock = roles.length
     ? roles.map((r) => `## Role: ${r.name}\n${r.prompt}`).join('\n\n')
@@ -172,7 +149,7 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     `## How You Work\n\nAs a virtual employee, here is how you operate.\n\n` +
     toolSections.join('\n\n')
 
-  return [identityBlock, platformPrompt, roleBlock, sopBlock, toolsBlock, agentsBlock, memoryBlock, todoBlock]
+  return [identityBlock, roleBlock, toolsBlock, agentsBlock, memoryBlock, todoBlock]
     .filter(Boolean)
     .join('\n\n')
 }
@@ -222,7 +199,6 @@ async function createLiveSession(
   if (!model) throw new Error(`Model not found: ${config.provider}/${config.modelId}`)
 
   const workspaceDir = resolveWorkspaceDir()
-  ensureSopFile(workspaceDir)
   const systemPrompt = systemPromptOverride ?? buildSystemPrompt(agent, workspaceDir)
   if (debugMode) {
     dbg(agent.name, chalk.bold('── NEW SESSION ──'))
@@ -449,7 +425,6 @@ export async function runScheduledTask(
   opts?: InvokeAgentOpts,
 ): Promise<string> {
   const workspaceDir = resolveWorkspaceDir()
-  ensureSopFile(workspaceDir)
   const baseSystemPrompt = buildSystemPrompt(agent, workspaceDir)
   const systemPrompt = opts?.systemPromptAddendum
     ? `${baseSystemPrompt}\n\n${opts.systemPromptAddendum}`

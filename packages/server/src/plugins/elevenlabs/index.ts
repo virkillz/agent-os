@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin, ToolContext } from '../types.js'
+import type { AgentOSPlugin, ToolContext } from '../types.js'
 
 // Default voice: "Rachel" — warm, natural narration voice
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
@@ -11,7 +11,7 @@ function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
 }
 
-export const elevenlabsPlugin: RascalPlugin = {
+export const elevenlabsPlugin: AgentOSPlugin = {
   config: {
     id: 'elevenlabs',
     displayName: 'ElevenLabs',

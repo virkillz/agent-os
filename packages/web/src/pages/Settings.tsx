@@ -74,9 +74,9 @@ export default function Settings() {
                 }`
               }
               style={({ isActive }) => ({
-                color: isActive ? 'var(--text-primary)' : 'var(--subtle)',
-                background: isActive ? 'rgba(245,158,11,0.08)' : undefined,
-                borderLeft: `2px solid ${isActive ? 'rgb(var(--accent))' : 'transparent'}`,
+                color: isActive ? '#e8f4f8' : 'var(--subtle)',
+                background: isActive ? 'rgba(100, 210, 230, 0.08)' : undefined,
+                borderLeft: `2px solid ${isActive ? 'rgba(100, 210, 230, 0.6)' : 'transparent'}`,
               })}
             >
               {label}

@@ -1,10 +1,10 @@
 {
-  "name": "@rascal-inc/server",
+  "name": "@agentos/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "rascal": "./bin/rascal.js"
+    "agentos": "./bin/agentos.js"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts start --dir ../../",

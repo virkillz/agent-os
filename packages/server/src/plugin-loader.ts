@@ -2,18 +2,18 @@
  * Plugin loader — singleton that manages built-in plugins.
  *
  * Responsibilities:
- * - Hold the registry of all RascalPlugin instances
+ * - Hold the registry of all AgentOSPlugin instances
  * - Seed the plugins table in SQLite on startup
  * - Provide getToolsForIds() used by buildAgentTools() in platform-tools.ts
  * - Run plugin setup() when a plugin becomes configured
  */
 
 import { builtInPlugins } from './plugins/index.js'
-import type { RascalPlugin, ToolContext } from './plugins/types.js'
+import type { AgentOSPlugin, ToolContext } from './plugins/types.js'
 import { getDb } from './db.js'
 
 class PluginLoader {
-  private registry = new Map<string, RascalPlugin>()
+  private registry = new Map<string, AgentOSPlugin>()
   private workspaceDir = ''
 
   /** Call once at startup before seedDb() */
@@ -54,12 +54,12 @@ class PluginLoader {
   }
 
   /** Return all registered plugins */
-  getAll(): RascalPlugin[] {
+  getAll(): AgentOSPlugin[] {
     return [...this.registry.values()]
   }
 
   /** Return a single plugin by ID */
-  get(id: string): RascalPlugin | undefined {
+  get(id: string): AgentOSPlugin | undefined {
     return this.registry.get(id)
   }
 
@@ -70,7 +70,7 @@ class PluginLoader {
    */
   getToolsForIds(toolIds: string[], ctx: ToolContext) {
     // Build a map of toolId → plugin for fast lookup
-    const toolToPlugin = new Map<string, RascalPlugin>()
+    const toolToPlugin = new Map<string, AgentOSPlugin>()
     for (const plugin of this.registry.values()) {
       for (const toolId of plugin.config.toolIds) {
         toolToPlugin.set(toolId, plugin)
@@ -78,7 +78,7 @@ class PluginLoader {
     }
 
     // Deduplicate plugins to avoid creating the same tools twice
-    const usedPlugins = new Set<RascalPlugin>()
+    const usedPlugins = new Set<AgentOSPlugin>()
     const requestedPluginToolIds = new Set<string>()
 
     for (const id of toolIds) {

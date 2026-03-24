@@ -45,7 +45,7 @@ const PRESETS = [
   },
 ]
 
-const STORAGE_KEY = 'rascal:background'
+const STORAGE_KEY = 'agentos:background'
 
 function applyBackground(value: string) {
   document.body.style.backgroundImage = value
@@ -120,14 +120,14 @@ export default function SettingsAppearance() {
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       border: isActive
-                        ? '2px solid rgb(var(--accent))'
+                        ? '2px solid rgba(100, 210, 230, 0.5)'
                         : '2px solid rgba(255,255,255,0.08)',
-                      boxShadow: isActive ? '0 0 0 2px rgba(245,158,11,0.2)' : undefined,
+                      boxShadow: isActive ? '0 0 0 2px rgba(80, 200, 220, 0.15)' : undefined,
                     }}
                   />
                   <span
                     className="text-xs font-medium"
-                    style={{ color: isActive ? 'rgb(var(--accent))' : 'var(--subtle)' }}
+                    style={{ color: isActive ? 'rgba(140, 200, 220, 0.9)' : 'var(--subtle)' }}
                   >
                     {preset.label}
                   </span>

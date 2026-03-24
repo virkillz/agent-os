@@ -37,6 +37,6 @@ if (tsxBin && existsSync(srcEntry)) {
   })
   process.exit(result.status ?? 1)
 } else {
-  console.error('rascal: no built dist found. Run `npm run build` first.')
+  console.error('agentos: no built dist found. Run `npm run build` first.')
   process.exit(1)
 }

@@ -1,13 +1,13 @@
 import fs from 'fs'
 import path from 'path'
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin, ToolContext } from '../types.js'
+import type { AgentOSPlugin, ToolContext } from '../types.js'
 
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
 }
 
-export const youtubePlugin: RascalPlugin = {
+export const youtubePlugin: AgentOSPlugin = {
   config: {
     id: 'youtube',
     displayName: 'YouTube',

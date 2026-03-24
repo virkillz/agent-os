@@ -1,5 +1,5 @@
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin } from '../types.js'
+import type { AgentOSPlugin } from '../types.js'
 
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
@@ -8,7 +8,7 @@ function ok(text: string) {
 async function fetchReadable(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; rascal-bot/1.0)',
+      'User-Agent': 'Mozilla/5.0 (compatible; agentos-bot/1.0)',
       'Accept': 'text/html,application/xhtml+xml',
     },
     redirect: 'follow',
@@ -49,7 +49,7 @@ async function fetchReadable(url: string): Promise<string> {
   return full.length > 12000 ? full.slice(0, 12000) + '\n\n[truncated]' : full
 }
 
-export const fetchContentPlugin: RascalPlugin = {
+export const fetchContentPlugin: AgentOSPlugin = {
   config: {
     id: 'fetch-content',
     displayName: 'Fetch Content',

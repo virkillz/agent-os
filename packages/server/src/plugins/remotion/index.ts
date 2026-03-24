@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { execSync, spawn } from 'child_process'
 import { Type } from '@sinclair/typebox'
-import type { RascalPlugin, ToolContext } from '../types.js'
+import type { AgentOSPlugin, ToolContext } from '../types.js'
 
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }], details: {} }
@@ -20,7 +20,7 @@ function isRemotionInstalled(): boolean {
   return fs.existsSync(path.join(REMOTION_DIR, 'node_modules', 'remotion'))
 }
 
-export const remotionPlugin: RascalPlugin = {
+export const remotionPlugin: AgentOSPlugin = {
   config: {
     id: 'remotion',
     displayName: 'Remotion',
@@ -142,7 +142,7 @@ Config.setOverwriteOutput(true)
         execute: async (_id: string, params: any) => {
           if (!fs.existsSync(rDir)) {
             throw new Error(
-              'Remotion engine not set up. Call the plugin setup or run `rascal start` to trigger setup.',
+              'Remotion engine not set up. Call the plugin setup or run `agentos start` to trigger setup.',
             )
           }
 

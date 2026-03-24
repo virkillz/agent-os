@@ -18,8 +18,8 @@ export default {
         border: 'var(--border)',
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
-          dim: '#d97706',
-          glow: 'rgba(245, 158, 11, 0.15)',
+          dim: 'rgba(80, 190, 210, 0.85)',
+          glow: 'rgba(80, 200, 220, 0.15)',
         },
         muted: 'var(--muted)',
         subtle: 'var(--subtle)',

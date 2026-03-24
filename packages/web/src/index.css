@@ -10,7 +10,7 @@
     --s2: 16 32 60;          /* card/input surface */
     --s3: 24 44 80;          /* elevated/hover */
     --border: rgba(255,255,255,0.10);
-    --accent: 245 158 11;    /* amber-500 */
+    --accent: 100 210 230;   /* cyan */
     --muted: #7a9ec0;
     --subtle: #a8c8e8;
     --text-primary: #e8f2ff;
@@ -78,10 +78,15 @@
   .btn-primary {
     @apply font-semibold px-4 py-2 rounded text-sm transition-all
            disabled:opacity-40 disabled:cursor-not-allowed active:scale-95;
-    background: rgb(var(--accent));
-    color: #0a0f1a;
+    background: rgba(20, 60, 80, 0.65);
+    border: 1.5px solid rgba(100, 210, 230, 0.5);
+    color: #e8f4f8;
+    box-shadow: 0 0 20px rgba(80, 200, 220, 0.1), inset 0 1px 0 rgba(255,255,255,0.05);
   }
-  .btn-primary:hover:not(:disabled) { background: #d97706; }
+  .btn-primary:hover:not(:disabled) {
+    background: rgba(25, 75, 100, 0.75);
+    box-shadow: 0 0 30px rgba(80, 200, 220, 0.2), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
 
   .btn-ghost {
     @apply px-3 py-2 rounded text-sm transition-colors;
@@ -145,9 +150,9 @@
     color: var(--text-primary);
   }
   .nav-item.active {
-    background: rgba(245, 158, 11, 0.08);
+    background: rgba(100, 210, 230, 0.08);
     color: var(--text-primary);
-    border-left-color: rgb(var(--accent));
+    border-left-color: rgba(100, 210, 230, 0.6);
   }
 }
 

@@ -39,7 +39,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('rascal:background')
+    const saved = localStorage.getItem('agentos:background')
     if (saved) {
       const preset = ['default', 'midnight', 'aurora', 'nebula', 'void', 'deep-ocean', 'ember']
       const PRESET_VALUES: Record<string, string> = {
@@ -117,7 +117,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
-          <Route element={<Layout currentUser={currentUser} onLogout={() => { setCurrentUser(null); setAuthState('unauthenticated') }} />}>
+          <Route element={<Layout currentUser={currentUser} onLogout={async () => { await api.auth.logout(); setCurrentUser(null); setAuthState('unauthenticated') }} />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/channels" element={<Channels />} />

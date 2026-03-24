@@ -3,7 +3,7 @@ import { useStore } from '../../store.ts'
 
 export default function SettingsCompany() {
   const { settings, updateSettings } = useStore()
-  const [logo, setLogo] = useState(settings?.companyLogo ?? '/rascals.png')
+  const [logo, setLogo] = useState(settings?.companyLogo ?? '/agentos.png')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -60,7 +60,7 @@ export default function SettingsCompany() {
                 src={logo}
                 alt="Logo"
                 className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).src = '/rascals.png' }}
+                onError={(e) => { (e.target as HTMLImageElement).src = '/agentos.png' }}
               />
             </div>
             <div className="space-y-2">

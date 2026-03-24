@@ -31,7 +31,7 @@ export interface PluginConfig {
 
 // ── Plugin interface ───────────────────────────────────────────────────────────
 
-export interface RascalPlugin {
+export interface AgentOSPlugin {
   config: PluginConfig
 
   /**
