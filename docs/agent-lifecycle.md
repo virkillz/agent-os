@@ -1,6 +1,6 @@
 # Agent Lifecycle
 
-Agents in rascal-inc are **reactive** — they run when triggered by one of four entry points. The `is_active` flag on each agent acts as a global kill switch: when `false`, the agent ignores all triggers.
+Agents in agent-os are **reactive** — they run when triggered by one of several entry points. The `is_active` flag on each agent acts as a global kill switch: when `false`, the agent ignores all triggers.
 
 ---
 
@@ -8,49 +8,34 @@ Agents in rascal-inc are **reactive** — they run when triggered by one of four
 
 | Trigger | Behavior |
 |---------|----------|
-| **DM** | Always responds (unless `is_active = false`) |
-| **Group chat @mention** | Reads channel history → responds |
-| **Group chat (no mention)** | Ignored |
-| **Scheduler (cron fires)** | Reads `#public` history → decides whether to respond + works on todos |
+| **Direct chat** | Always responds (unless `is_active = false`) |
+| **Scheduler (cron fires)** | Enqueues to invocation queue → agent executes task prompt |
+| **Slack DM / @mention** | Connector stores message → enqueues invocation → agent responds via Slack |
+| **Telegram DM / @mention** | Connector stores message → enqueues invocation → agent responds via Telegram |
 | **`is_active = false`** | Agent ignores all of the above |
 
 ---
 
-## Four Triggering Paths
+## Triggering Paths
 
-### 1. Direct Message (Human → Agent)
+### 1. Direct Chat (Human → Agent)
 
-The user opens a DM channel with the agent and sends a message.
+The user opens an agent's chat page (`/agents/:id/chat`) and sends a message.
 
 ```
-User sends message in DM channel
-  → POST /api/channels/:id/messages { content }
-  → channels.ts persists message, detects agent is recipient
-  → chatWithAgent(agent, message, model)           [fire-and-forget]
-  → Pi SDK session.prompt(message)
+User types in AgentChat page
+  → POST /api/agents/:id/chat { message }
+  → chat.ts persists to chat_messages
+  → chatWithAgent(agent, message, model)  — awaits reply
+  → Pi SDK persistent session (liveSessions map)
   → agent:thinking → [LLM runs] → agent:reply → agent:idle
-  → reply persisted to channel_messages
-  → WS broadcasts channel:message event
+  → reply persisted to chat_messages
+  → res.json({ reply })
 ```
 
-### 2. Group Channel @mention
+This is the only **synchronous** path — the HTTP response waits for the full reply. It uses a **persistent session** per agent (`liveSessions` map in `agent-runner.ts`), so conversation context is retained across messages.
 
-A message containing `@agentName` is posted to a group channel.
-
-```
-User posts "@alice can you research X" in #public
-  → POST /api/channels/:id/messages { content }
-  → channels.ts parses @mentions from content
-  → for each mentioned agent:
-      → fetch recent channel history (last N messages)
-      → chatWithAgent(agent, contextualPrompt, model)   [fire-and-forget]
-      → reply posted back to same channel
-      → WS broadcasts channel:message event
-```
-
-The agent receives the full recent channel history as context, not just the triggering message.
-
-### 3. Scheduler (cron-based)
+### 2. Scheduler (cron-based)
 
 Defined per-agent in `agent_schedules`. The scheduler polls every 60 seconds.
 
@@ -59,42 +44,70 @@ setInterval (60s)
   → query agent_schedules WHERE enabled = 1 AND next_run_at <= now
   → for each due schedule:
       → check agent.is_active — skip if false
-      → check skip_if_no_todos — skip if true and todo list is empty
       → advance next_run_at (crash-safe — done before firing)
       → emit schedule:fired event (UI notification)
-      → fetch recent #public channel history
-      → chatWithAgent(agent, scheduledPrompt + channelContext, model)
-      → reply persisted to channel_messages (posted to #public)
+      → look up associated trigger row in agent_triggers
+      → enqueueInvocation({ agentId, triggerId, triggerType: 'scheduler', prompt })
 ```
 
-`skip_if_no_todos = true` is useful for agents whose scheduled runs only make sense when they have pending work. If the todo list is empty, the cron fires and exits immediately.
+The enqueued invocation is picked up by the queue worker (see below).
 
-### 4. Direct Agent Chat (legacy path)
+### 3. External Platform (Slack / Telegram)
 
-The original per-agent chat page (`/agents/:id/chat`) remains available as a direct interface to an agent, bypassing the channel system. This uses `chat_messages` rather than `channel_messages` and is kept for backward compatibility.
+External messages arrive via connectors — long-running services that bridge Slack (Socket Mode) and Telegram (long polling) to the invocation queue.
 
 ```
-User types in AgentChat page
-  → POST /api/agents/:id/chat { message }
-  → chat.ts persists to chat_messages
-  → chatWithAgent(agent, message, model)  — synchronous (awaits reply)
-  → reply persisted to chat_messages
-  → res.json({ reply })
+[Slack Socket Mode / Telegram long poll] receives event
+  → Connector normalizes to InboundMessage
+  → Store inbound message to platform_messages table
+  → Determine if agent should respond (DM: always, @mention: always, etc.)
+  → If responding: enqueueInvocation() with trigger context + conversation scope
+  → Queue worker picks up invocation
+  → invokeAgent() builds system prompt + platform context addendum
+  → Fresh isolated Pi SDK session runs the prompt
+  → Response stored to platform_messages (outbound)
+  → Connector delivers reply via platform API (sendMessage)
 ```
 
-This is the only **synchronous** path — the HTTP response waits for the full reply.
+---
+
+## Invocation Queue
+
+All non-interactive triggers (scheduler, Slack, Telegram) flow through a unified invocation pipeline:
+
+```
+enqueueInvocation()
+  → invocation_queue table (status: 'pending')
+  → queue worker polls every 5s
+  → picks one pending row per agent (no parallel runs per agent)
+  → marks 'processing'
+  → calls invokeAgent(agent, prompt, model, opts)
+  → on success: marks 'done', updates trigger stats (last_fired_at, fire_count)
+  → on error: retries with exponential backoff (10s → 30s → 60s → 120s, max 3 retries)
+  → on hard failure: marks 'failed', emits invocation:failed event
+```
+
+The queue worker deduplicates — only one invocation per agent processes at a time.
 
 ---
 
 ## Session Model
 
-All paths converge on `chatWithAgent()` in `agent-runner.ts`. This function manages a **persistent Pi SDK session per agent** (the `liveSessions` map).
+There are two session strategies:
 
-- **First call**: creates a new session (`createLiveSession`), assembles the system prompt from the 3-layer composition (see [system-prompt.md](system-prompt.md)).
-- **Subsequent calls**: reuses the existing session — the LLM retains conversation context across all trigger types.
-- **Session reset**: happens on explicit `DELETE /api/agents/:id/chat` or on error.
+| Path | Session | Function |
+|------|---------|----------|
+| Direct chat | **Persistent** — one `LiveSession` per agent in `liveSessions` map, retains context across messages | `chatWithAgent()` |
+| Scheduler / Slack / Telegram | **Fresh isolated** — new session per invocation, never stored in `liveSessions` | `invokeAgent()` → `runScheduledTask()` |
 
-The system prompt is assembled **once at session creation**. If memory, todos, or role assignments change after a session is live, those changes won't reflect until the session is reset.
+Both paths converge on `buildSystemPrompt()` in `agent-runner.ts` to assemble the system prompt from the layered composition (see [system-prompt.md](system-prompt.md)).
+
+For platform triggers, the queue worker appends a **system prompt addendum** containing conversation history and trigger context before calling `invokeAgent()`.
+
+- **Session creation**: `createLiveSession()` in `agent-runner.ts`
+- **Session reset**: `clearSession()` evicts from `liveSessions` — happens on error or explicit `DELETE /api/agents/:id/chat`
+
+The system prompt is assembled **once at session creation**. For persistent sessions, changes to memory, todos, or roles after creation won't reflect until the session is reset.
 
 ---
 
@@ -102,19 +115,19 @@ The system prompt is assembled **once at session creation**. If memory, todos, o
 
 Setting `is_active = false` on an agent causes all trigger paths to skip it:
 
-- DM handler checks `is_active` before calling `chatWithAgent`
-- Group chat @mention handler skips inactive agents during mention resolution
-- Scheduler skips inactive agents before firing
+- Direct chat handler checks `is_active` before calling `chatWithAgent`
+- Scheduler skips inactive agents before enqueuing
+- Queue worker checks `is_active` before processing invocations
 
-An inactive agent's sessions remain in memory but are not invoked. Toggling back to `is_active = true` resumes normal behavior immediately.
+An inactive agent's persistent session remains in memory but is not invoked. Toggling back to `is_active = true` resumes normal behavior immediately.
 
 ---
 
 ## Summary
 
-| Trigger | Who initiates | Async? | Channel? | Entry point |
-|---------|---------------|--------|----------|-------------|
-| DM | Human via UI | Yes | DM channel | `POST /api/channels/:id/messages` |
-| @mention | Human via UI | Yes | Group channel | `POST /api/channels/:id/messages` |
-| Scheduler | Clock (60s poll) | Yes | #public | `scheduler.ts` setInterval |
-| Direct chat | Human via UI | No (awaits) | chat_messages | `POST /api/agents/:id/chat` |
+| Trigger | Who initiates | Async? | Session | Entry point |
+|---------|---------------|--------|---------|-------------|
+| Direct chat | Human via UI | No (awaits) | Persistent | `POST /api/agents/:id/chat` → `chatWithAgent()` |
+| Scheduler | Clock (60s poll) | Yes (queued) | Fresh | `scheduler.ts` → `invocation_queue` → `invokeAgent()` |
+| Slack DM / @mention | External user | Yes (queued) | Fresh | Slack connector → `invocation_queue` → `invokeAgent()` |
+| Telegram DM / @mention | External user | Yes (queued) | Fresh | Telegram connector → `invocation_queue` → `invokeAgent()` |

@@ -35,12 +35,12 @@ Entry types:
 
 ## When Files Are Created
 
-A new `.jsonl` file is created each time a new `LiveSession` is started. This happens when:
+A new `.jsonl` file is created each time a new session is started via `createLiveSession()`. This happens when:
 
 - **First message to an agent** that has no active session in memory (`liveSessions` map in `agent-runner.ts`).
 - **After an agent error** — the failed session is evicted from `liveSessions`, so the next message starts a new file.
 - **After an explicit `clearSession()` call** — same eviction behaviour.
-- **Each scheduled task** — scheduled runs get their own isolated session and are never kept in `liveSessions`. The file is still written to disk.
+- **Each non-interactive invocation** (scheduler, Slack, Telegram) — these go through `invokeAgent()` which creates a fresh isolated session per run, never kept in `liveSessions`. The file is still written to disk.
 
 There is no automatic session continuation on server restart. Each restart means the next message will create a new file. Previous files are retained on disk indefinitely.
 
@@ -78,5 +78,5 @@ If a user edits an earlier message, the SDK moves the "leaf" pointer back to tha
 
 - **Session creation**: `createLiveSession()` in `packages/server/src/agent-runner.ts` — calls `SessionManager.create(dataDir, sessionsDir)`.
 - **Session eviction**: `clearSession()` in the same file removes a session from `liveSessions`.
-- **Scheduled sessions**: `runScheduledTask()` in the same file creates an ephemeral session.
+- **Non-interactive sessions**: `invokeAgent()` → `runScheduledTask()` in the same file creates a fresh isolated session per invocation.
 - **SDK implementation**: `node_modules/@mariozechner/pi-coding-agent/dist/core/session-manager.js`.

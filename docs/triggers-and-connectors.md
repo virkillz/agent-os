@@ -1,10 +1,8 @@
-# Triggers & Connectors — Design Document
+# Triggers & Connectors
 
-## 1. Problem Statement
+## 1. Overview
 
-Agents currently have exactly one way to be woken up: the internal scheduler (cron-based). They also have one way to receive user messages: the web UI chat.
-
-We want agents to behave like digital employees — reachable from multiple surfaces (Slack, Telegram, group chats) and invocable by both timers and humans. This document defines the unified architecture for all agent invocation paths.
+Agents behave like digital employees — reachable from multiple surfaces (web UI, Slack, Telegram) and invocable by both timers and humans. This document describes the unified architecture for all agent invocation paths.
 
 ---
 
@@ -25,8 +23,8 @@ We want agents to behave like digital employees — reachable from multiple surf
 
 ```
 Triggers
-├── Scheduler          — cron timer fires                  (exists)
-├── InternalChat       — user sends message via web UI     (exists)
+├── Scheduler          — cron timer fires
+├── InternalChat       — user sends message via web UI
 ├── SlackDM            — Slack user DMs the agent's bot
 ├── SlackChannel       — agent @mentioned in Slack channel or thread
 ├── TelegramDM         — Telegram user messages the bot
@@ -642,68 +640,12 @@ Add to `event-bus.ts`:
 
 ---
 
-## 14. Implementation Phases
+## 14. Open Questions
 
-### Phase 1 — Trigger Abstraction & Queue
-- Define `TriggerContext` interface
-- Refactor `agent-runner.ts`: extract `invokeAgent(agentId, prompt, triggerContext?)` as unified entry point
-- Create `invocation_queue` table (with `trigger_id` column)
-- Implement queue worker with cooldown/retry logic
-- Emit invocation events to event bus
-
-### Phase 1.5 — Trigger Registry
-- Create `agent_triggers` table
-- Auto-insert `internal_chat` trigger on agent creation/seed
-- Auto-insert/delete `scheduler` trigger rows when `agent_schedules` rows are created/deleted
-- Wire `invocation_queue.trigger_id` → `agent_triggers.id` on each enqueue
-- Update `last_fired_at` and `fire_count` on invocation completion
-- Implement triggers CRUD API (`/api/agents/:id/triggers`)
-- Implement prompt preview endpoint (`/api/agents/:id/triggers/:tid/preview-prompt`)
-- Frontend: Triggers tab in agent detail view with list display and preview modal
-
-### Phase 2 — Schema & API
-- Add `agent_integrations` and `platform_messages` tables to `db.ts`
-- Implement integrations CRUD API (`/api/agents/:id/integrations`)
-- Implement platform messages query API
-- Create connector loader skeleton
-
-### Phase 3 — Slack Connector
-- Add Slack Bolt SDK (`@slack/bolt`)
-- Implement `SlackConnector` using Socket Mode
-- Inbound message storage with thread_id, reply_to_msg_id, deduplication
-- Auto-register `slack_dm` and `slack_channel` trigger rows on first contact
-- Threading behavior: always reply in thread, prepend thread root to context
-- Response delivery with Slack markdown formatting
-- `addReaction` via `reactions.add`
-
-### Phase 4 — Telegram Connector
-- Add Telegraf SDK
-- Implement `TelegramConnector` using long polling
-- Quote-reply detection via `reply_to_message` field — store `reply_to_msg_id`
-- Auto-register `telegram_dm` and `telegram_group` trigger rows on first contact
-- Reaction storage and `addReaction` via `setMessageReaction`
-- Same invocation pipeline as Slack
-
-### Phase 5 — Platform Tools
-- `get_conversation_history`: queries `platform_messages`, resolves reply_to inline
-- `add_reaction`: calls connector's `addReaction` method
-- Inject both into agent tool set (available by default)
-- Add tool documentation to system prompt sections
-
-### Phase 6 — Frontend
-- Integration management UI in agent settings
-- Platform message log viewer (with thread grouping)
-- Queue status display (pending/processing/failed)
-- Connector health status indicator
-
----
-
-## 15. Open Questions (Deferred)
-
-1. **File/media attachments**: If a user sends an image or file in Slack/Telegram, how should the agent handle it? Store a reference, pass a URL to the agent? Defer to later phase.
+1. **File/media attachments**: If a user sends an image or file in Slack/Telegram, how should the agent handle it? Store a reference, pass a URL to the agent?
 
 2. **Cross-platform DM**: Can a user on Slack trigger an agent that responds on Telegram? Not planned — each integration is self-contained.
 
-3. **Platform-level rate limits on outbound messages**: Slack enforces 1 msg/sec per channel. The connector's `sendMessage` should handle this internally (e.g. simple delay + retry), separate from the AI provider cooldown in the invocation queue.
+3. **Platform-level rate limits on outbound messages**: Slack enforces 1 msg/sec per channel. The connector's `sendMessage` handles this internally, separate from the AI provider cooldown in the invocation queue.
 
-4. **Telegram thread support**: Telegram groups don't have threads the same way Slack does (only "topics" in supergroups). Scope for Telegram group conversations is the group itself, not a thread. Revisit if topic-based scoping becomes relevant.
+4. **Telegram thread support**: Telegram groups don't have threads the same way Slack does (only "topics" in supergroups). Scope for Telegram group conversations is the group itself, not a thread.

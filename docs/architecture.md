@@ -2,7 +2,7 @@
 
 ## Overview
 
-rascal-inc is a Node.js monorepo with two packages:
+agent-os is a Node.js monorepo with two packages:
 
 - `packages/server` — Express + WebSocket backend (port 3000)
 - `packages/web` — React + Vite frontend (port 5173, proxies `/api` and `/ws` to backend)
@@ -32,14 +32,32 @@ The `EventBus` (`server/src/event-bus.ts`) is an in-memory pub/sub. The WebSocke
 
 | Event | Payload | Trigger |
 |-------|---------|---------|
+| `agent:created` | `{ agentId }` | New agent created |
 | `agent:thinking` | `{ agentId }` | Agent starts processing |
-| `agent:reply` | `{ agentId, message }` | Agent produces output |
+| `agent:reply` | `{ agentId, preview }` | Agent produces output |
 | `agent:idle` | `{ agentId }` | Agent finishes |
-| `channel:message` | `{ channelId, message }` | New message in any channel |
-| `board:card_moved` | `{ boardId, cardId, fromLane, toLane }` | Card moved on kanban |
-| `employee:status` | `{ employeeId, type, status }` | Online/offline/active status |
+| `agent:error` | `{ agentId, error }` | Agent encountered an error |
+| `todo:created` | `{ agentId, todo }` | Todo item created |
+| `todo:updated` | `{ agentId, todo }` | Todo item updated |
+| `todo:deleted` | `{ agentId, todoId }` | Todo item deleted |
+| `memory:created` | `{ agentId, entry }` | Memory entry created |
+| `memory:deleted` | `{ agentId, entryId }` | Memory entry deleted |
 | `schedule:fired` | `{ agentId, scheduleId, label }` | Cron schedule triggered |
-| `notification` | `{ title, body, type }` | System notification |
+| `schedule:created` | `{ agentId, scheduleId, label }` | New schedule created |
+| `workspace:change` | `{ path, action }` | File created/updated/deleted in workspace |
+| `chat:message` | `{ agentId, agentName, role, content, messageId }` | Chat message logged |
+| `notification:created` | `{ notification }` | System notification |
+| `provider_account:cooldown` | `{ accountId, provider, cooldownMinutes }` | Provider rate-limited |
+| `invocation:queued` | `{ agentId, triggerType, queueId }` | Task queued |
+| `invocation:completed` | `{ agentId, triggerType, queueId }` | Queued task completed |
+| `invocation:failed` | `{ agentId, triggerType, queueId, error }` | Queued task failed |
+| `invocation:rate_limited` | `{ agentId, retryAfter }` | Invocation rate-limited |
+| `connector:started` | `{ agentId, platform }` | Slack/Telegram connector started |
+| `connector:stopped` | `{ agentId, platform }` | Connector stopped |
+| `connector:error` | `{ agentId, platform, error }` | Connector error |
+| `integration:config_updated` | `{ agentId, platform }` | Integration config changed (hot-reload) |
+| `board:card_moved` | `{ cardId, boardId, laneId, title }` | Card moved on kanban |
+| `plugin:configured` | `{ pluginId }` | Plugin configured |
 
 ---
 
@@ -49,127 +67,165 @@ The `EventBus` (`server/src/event-bus.ts`) is an in-memory pub/sub. The WebSocke
 
 ```
 server/src/
-├── index.ts            # CLI entry (starts server, opens browser)
-├── server.ts           # Express app: mounts routers, auth middleware, WS upgrade
-├── db.ts               # Schema init, getDb(), typed query helpers
-├── auth.ts             # bcrypt password hashing, express-session, requireAuth/requireAdmin
-├── agent-runner.ts     # Pi SDK session lifecycle, chatWithAgent(), buildSystemPrompt()
-├── scheduler.ts        # 60s cron poll, fires agent triggers, skip_if_no_todos logic
-├── event-bus.ts        # Typed AppEvent union, emit(), subscribe()
-├── platform-tools.ts   # Workspace filesystem tools exposed to agents
+├── index.ts              # CLI entry (agentos init, agentos start), bootstraps all services
+├── server.ts             # Express app: mounts routers, WS init, queue worker, connectors
+├── db.ts                 # SQLite schema, migrations, WAL mode, foreign keys, seed data
+├── agent-runner.ts       # Pi SDK session lifecycle: chatWithAgent(), invokeAgent(), buildSystemPrompt()
+├── scheduler.ts          # 60s cron poll, enqueues due tasks to invocation_queue
+├── queue-worker.ts       # 5s poll on invocation_queue, processes one agent at a time with retry
+├── event-bus.ts          # Typed AppEvent union, emit(), on()
+├── notification-service.ts # Maps domain events to persistent notifications
+├── account-pool.ts       # Provider account selection with cooldown management
+├── platform-tools.ts     # Composes platform tools + plugin tools for each agent
+├── platform-tools/
+│   ├── loader.ts         # Registry: getDefaultToolIds(), getToolsForIds(), getSystemPromptSections()
+│   ├── types.ts          # PlatformTool interface
+│   ├── memory/           # memory_add tool
+│   ├── todos/            # Todo management tools
+│   ├── scheduling/       # Schedule management tools
+│   ├── agent-mgmt/       # create_agent, manage agents
+│   ├── platform-comms/   # send_direct_message, channel_post
+│   ├── messaging/        # Messaging tools
+│   └── board/            # Kanban board tools
+├── connectors/
+│   ├── loader.ts         # Starts/stops connectors based on agent_integrations table
+│   ├── slack/index.ts    # SlackConnector (Socket Mode via Bolt SDK)
+│   └── telegram/index.ts # TelegramConnector (long polling via Telegraf)
+├── plugin-loader.ts      # Loads plugins from plugins/, manages env config
+├── plugins/              # Optional plugins: remotion, elevenlabs, gemini-image, etc.
 └── api/
-    ├── agents.ts       # Agent CRUD, is_active toggle, role assignment
-    ├── chat.ts         # Legacy direct chat (chat_messages table)
-    ├── channels.ts     # Channels, DMs, messages, @mention resolution
-    ├── boards.ts       # Boards, lanes, cards, lane rule enforcement
-    ├── roles.ts        # Role CRUD, default role seeding
-    ├── users.ts        # Human user CRUD, login endpoint
-    ├── plugins.ts      # Plugin registry, per-agent assignment
-    ├── memory.ts       # Agent memory CRUD
-    ├── todos.ts        # Agent todo CRUD
-    ├── schedules.ts    # Agent schedule CRUD
-    ├── settings.ts     # Company settings, provider keys, platform prompt
-    └── workspace.ts    # Workspace file browser
+    ├── agents.ts         # Agent CRUD, is_active toggle, role assignment
+    ├── chat.ts           # Direct agent chat (chat_messages table)
+    ├── memory.ts         # Agent memory CRUD
+    ├── todos.ts          # Agent todo CRUD
+    ├── schedules.ts      # Agent schedule CRUD
+    ├── triggers.ts       # Trigger registry: list, enable/disable, preview prompt, invocation history
+    ├── integrations.ts   # Slack/Telegram integration CRUD, platform message query
+    ├── roles.ts          # Role CRUD, default role seeding
+    ├── users.ts          # Human user CRUD, auth, login/logout, avatar upload
+    ├── plugins.ts        # Plugin registry, configure/remove
+    ├── platform-tools.ts # List available platform tools
+    ├── skills.ts         # List available skills
+    ├── notifications.ts  # Notifications list, mark read
+    ├── provider-accounts.ts # Provider account key management
+    ├── workspace.ts      # Workspace file browser
+    └── settings.ts       # Company settings, default model, platform prompt
 ```
 
 ### Frontend
 
 ```
 web/src/
-├── App.tsx             # Auth gate: redirects to /login if no session
-├── store.ts            # Zustand AppState: agents, users, channels, boards, roles
-├── api.ts              # Typed fetch client organized by domain
+├── App.tsx               # Auth gate: first-run → onboarding, then login, then layout
+├── store.ts              # Zustand state: agents, memory, todos, schedules, notifications, plugins, workspace
+├── api.ts                # Typed fetch client organized by domain
+├── hooks/
+│   └── useAppEvents.ts   # WebSocket event listener hook
+├── contexts/
+│   └── ThemeContext.tsx   # Theme provider
 ├── components/
-│   ├── Layout.tsx      # Sidebar nav: Employees, Board, Channels, Workspace, Settings
-│   └── NotificationCenter.tsx
+│   ├── Layout.tsx         # Top bar nav: logo, back, settings, notifications, user profile
+│   ├── AgentProfileCard.tsx
+│   ├── AgentDetailModal.tsx
+│   ├── NotificationCenter.tsx
+│   ├── PageHeader.tsx
+│   └── agent-settings/    # Settings sub-components: Profile, Prompt, Model, Plugins, etc.
 └── pages/
-    ├── Login.tsx        # Username/password gate
-    ├── Onboarding.tsx   # First-run wizard
-    ├── Roster.tsx        # Employees list (humans + AI agents)
-    ├── AgentChat.tsx     # Legacy direct agent DM
-    ├── Channels.tsx      # Channel list + message view + @mention input
-    ├── Board.tsx         # Kanban: drag cards, manage lanes, lane rules
-    ├── Roles.tsx         # Role management + assign to agents
-    └── Settings.tsx      # Providers, platform prompt, company info
+    ├── Login.tsx          # Username/password gate
+    ├── Onboarding.tsx     # First-run setup wizard
+    ├── Dashboard.tsx      # Overview dashboard (home page)
+    ├── Roster.tsx         # Agent list
+    ├── Users.tsx          # Human user management
+    ├── AgentProfile.tsx   # Agent profile view
+    ├── AgentChat.tsx      # Direct agent chat
+    ├── AgentSettings.tsx  # Agent configuration (tools, plugins, model, integrations, triggers)
+    ├── AgentMemory.tsx    # Agent memory viewer/editor
+    ├── AgentTodos.tsx     # Agent todo list
+    ├── AgentSchedule.tsx  # Agent schedule management
+    ├── Workspace.tsx      # Workspace file browser
+    ├── Notifications.tsx  # Notification center page
+    └── settings/
+        ├── Company.tsx    # Company name, description
+        ├── Provider.tsx   # Default model provider
+        ├── ProviderAccounts.tsx # API key account management
+        ├── Model.tsx      # Default model selection, thinking level
+        ├── Extensions.tsx # Plugin management
+        ├── Skills.tsx     # Built-in skill toggles
+        ├── Roles.tsx      # Role CRUD
+        ├── Prompt.tsx     # Global platform prompt
+        └── Appearance.tsx # Theme/background selection
 ```
 
 ---
 
 ## Database Schema
 
-### Core tables (existed pre-refactor)
+### Core Tables
 
 | Table | Purpose |
 |-------|---------|
-| `settings` | Key/value store: company_name, platform_prompt, provider keys, etc. |
-| `agents` | AI agent profiles: name, system_prompt, model config, is_active |
-| `agent_memory` | Per-agent key/value memory |
-| `agent_todos` | Per-agent todo items |
-| `agent_schedules` | Cron schedules per agent (with skip_if_no_todos) |
-| `plugins` | Plugin registry |
-| `chat_messages` | Legacy direct chat history (kept for backward compat) |
-
-### New tables (added in platform pivot)
-
-| Table | Purpose |
-|-------|---------|
-| `users` | Human employees: username, password_hash, display_name, is_admin |
+| `settings` | Key/value store: company_name, platform_prompt, default model, etc. |
+| `agents` | AI agent profiles: name, role, description, system_prompt, model_config, avatar, is_active, is_default |
+| `users` | Human employees: username, password_hash, display_name, avatar, bio, is_admin |
+| `sessions` | Auth tokens linked to users |
 | `roles` | Named roles with prompt text |
 | `agent_roles` | Junction: agents ↔ roles (many-to-many) |
-| `channels` | Group channels and DM channels (is_dm flag) |
-| `channel_members` | Junction: channels ↔ employees (agent or user) |
-| `channel_messages` | All channel + DM messages |
-| `boards` | Kanban boards |
-| `lanes` | Lanes within a board (ordered by position) |
-| `cards` | Cards (tasks) on a board, assigned to an employee |
-| `lane_rules` | Allow-list rules controlling who can move cards into a lane |
 
-### Dropped tables
+### Per-Agent Data
 
-`templates`, `pipeline_projects`, `human_gates` — removed in the platform pivot.
+| Table | Purpose |
+|-------|---------|
+| `chat_messages` | Direct chat history (user/assistant messages per agent) |
+| `agent_memory` | Persistent memory entries (injected into system prompt) |
+| `agent_todos` | Todo items with completion state |
+| `agent_schedules` | Cron schedules with prompt, label, enabled flag, last/next run timestamps |
+
+### Trigger & Invocation Pipeline
+
+| Table | Purpose |
+|-------|---------|
+| `agent_triggers` | Registry of all invocation sources per agent (internal_chat, scheduler, slack_dm, slack_channel, telegram_dm, telegram_group) |
+| `invocation_queue` | Task queue with status (pending/processing/done/failed), retry logic, exponential backoff |
+
+### Platform Integrations
+
+| Table | Purpose |
+|-------|---------|
+| `agent_integrations` | Per-agent Slack/Telegram credentials and config (JSON blob) |
+| `platform_messages` | All inbound/outbound messages from external platforms (with thread, reply, reaction support) |
+
+### Infrastructure
+
+| Table | Purpose |
+|-------|---------|
+| `provider_accounts` | Multiple API key accounts per provider with cooldown timestamps |
+| `plugins` | Plugin registry with configured flag |
+| `notifications` | System notifications (agent, schedule, error, dm types) |
+| `notification_reads` | Per-user read state for notifications |
 
 ---
 
 ## Auth
 
-Session-based auth using `express-session` + SQLite session store. Passwords are hashed with `bcrypt`.
+Token-based auth using cookie sessions + SQLite. Passwords are hashed with `bcrypt`.
 
-- `requireAuth` middleware: blocks unauthenticated requests with 401
-- `requireAdmin` middleware: blocks non-admin users with 403
-- Sessions are stored in the `sessions` table in SQLite
+- Auth tokens stored in the `sessions` table
+- Cookie-based session tracking via `cookieParser`
+- First-run setup wizard creates initial admin user
 
 No JWT, no OAuth. Designed for single-server local deployment.
 
 ---
 
-## Lane Rules
-
-Lane rules are an **additive allow-list** on the destination lane:
-
-- If a lane has **no rules** → any employee can move a card there
-- If a lane has **any rules** → only matching employees can move a card there
-- Rule types:
-  - `admin_only` — only platform admins
-  - `role` — employees holding a specific role
-  - `employee` — a specific named employee (agent or user)
-
-Rule checking happens in `api/boards.ts` on `PATCH /api/boards/:id/cards/:cardId/move`.
-
----
-
 ## Plugin System
 
-Plugins implement `ToolDefinition` from the Pi SDK. They interact with external APIs and are installed at the platform level, then assigned per-agent.
-
-Default plugins: `brave-search`, `elevenlabs`, `gemini-image`, `youtube`, `remotion`, `sql_memory`, `kanban`
-
-The `kanban` plugin gives agents the ability to read board state, create cards, and move cards — enabling autonomous participation in project work.
+Plugins implement `ToolDefinition` from the Pi SDK. They interact with external APIs and are installed at the platform level, then assigned per-agent via the agent's `model_config.tools` array.
 
 ---
 
 ## Agent System Prompt
 
-See [system-prompt.md](system-prompt.md) for the full 3-layer composition (platform prompt → role prompts → identity prompt → memory/todos).
+See [system-prompt.md](system-prompt.md) for the layered composition (identity → roles → tools → directory → memory/todos).
 
 ## Agent Lifecycle
 
