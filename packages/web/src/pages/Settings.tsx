@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/settings/accounts', label: 'Accounts' },
   { to: '/settings/model', label: 'Model' },
   { to: '/settings/extensions', label: 'Extensions' },
+  { to: '/settings/mcp', label: 'MCP Servers' },
   { to: '/settings/skills', label: 'Skills' },
   { to: '/settings/roles', label: 'Roles' },
   { to: '/settings/appearance', label: 'Appearance' },

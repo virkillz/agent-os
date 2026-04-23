@@ -298,6 +298,19 @@ export const api = {
     clearCooldown: (id: string) => req<{ ok: boolean }>('POST', `/provider-accounts/${id}/clear-cooldown`),
   },
 
+  connectionProfiles: {
+    list: () => req<ConnectionProfile[]>('GET', '/connection-profiles'),
+    presets: () => req<ProviderPreset[]>('GET', '/connection-profiles/presets'),
+    fetchModels: (baseUrl: string, apiKey?: string) =>
+      req<string[]>('POST', '/connection-profiles/fetch-models', { baseUrl, apiKey }),
+    create: (data: { name: string; providerType: string; baseUrl: string; apiKey?: string; modelId?: string; isDefault?: boolean }) =>
+      req<ConnectionProfile>('POST', '/connection-profiles', data),
+    update: (id: string, data: { name?: string; providerType?: string; baseUrl?: string; apiKey?: string; modelId?: string; isDefault?: boolean }) =>
+      req<ConnectionProfile>('PUT', `/connection-profiles/${id}`, data),
+    setDefault: (id: string) => req<{ ok: boolean }>('PUT', `/connection-profiles/${id}/default`),
+    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/connection-profiles/${id}`),
+  },
+
   // ─── Integrations ─────────────────────────────────────────────────────────
 
   integrations: {
@@ -320,6 +333,20 @@ export const api = {
       const qs = params.toString() ? `?${params.toString()}` : ''
       return req<PlatformMessage[]>('GET', `/agents/${agentId}/platform-messages${qs}`)
     },
+  },
+
+  // ─── MCP Servers ────────────────────────────────────────────────────────────
+
+  mcp: {
+    list: () => req<McpServer[]>('GET', '/mcp'),
+    create: (data: { name: string; description?: string; command: string; args?: string[]; env?: Record<string, string> }) =>
+      req<McpServer>('POST', '/mcp', data),
+    update: (id: string, data: { name?: string; description?: string; command?: string; args?: string[]; env?: Record<string, string>; enabled?: boolean }) =>
+      req<McpServer>('PUT', `/mcp/${id}`, data),
+    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/mcp/${id}`),
+    listForAgent: (agentId: string) => req<McpServerWithAgent[]>('GET', `/mcp/agents/${agentId}`),
+    toggleForAgent: (agentId: string, mcpServerId: string, enabled: boolean) =>
+      req<{ ok: boolean }>('PUT', `/mcp/agents/${agentId}/${mcpServerId}`, { enabled }),
   },
 
   // ─── Triggers ─────────────────────────────────────────────────────────────
@@ -373,7 +400,7 @@ export interface Agent {
   description: string
   system_prompt: string
   model_config: string
-  modelConfig: { provider?: string; modelId?: string; thinkingLevel?: string; allowedSkills?: string[]; tools?: string[]; disabledTools?: string[]; accountId?: string }
+  modelConfig: { provider?: string; modelId?: string; thinkingLevel?: string; allowedSkills?: string[]; tools?: string[]; disabledTools?: string[]; accountId?: string; connectionProfileId?: string }
   source: string
   avatar_color: string
   avatar_url: string
@@ -388,7 +415,7 @@ export interface CreateAgentInput {
   role: string
   description?: string
   systemPrompt?: string
-  modelConfig?: { provider?: string; modelId?: string; thinkingLevel?: string; accountId?: string }
+  modelConfig?: { provider?: string; modelId?: string; thinkingLevel?: string; accountId?: string; connectionProfileId?: string }
   avatarUrl?: string
   avatarColor?: string
 }
@@ -402,6 +429,24 @@ export interface ProviderAccount {
   cooldownUntil: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface ConnectionProfile {
+  id: string
+  name: string
+  providerType: string
+  baseUrl: string
+  maskedKey: string
+  modelId: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProviderPreset {
+  id: string
+  label: string
+  baseUrl: string
 }
 
 export interface ChatMessage {
@@ -655,4 +700,20 @@ export interface InvocationRow {
   retry_after: string | null
   created_at: string
   processed_at: string | null
+}
+
+export interface McpServer {
+  id: string
+  name: string
+  description: string
+  command: string
+  args: string[]
+  env: Record<string, string>
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface McpServerWithAgent extends McpServer {
+  agentEnabled: boolean
 }

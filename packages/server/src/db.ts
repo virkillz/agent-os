@@ -178,6 +178,20 @@ function runMigrations(db: DB): void {
     CREATE INDEX IF NOT EXISTS idx_provider_accounts_provider
       ON provider_accounts(provider_id, is_active);
 
+    -- ── Connection Profiles ──────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS connection_profiles (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      provider_type TEXT NOT NULL,
+      base_url      TEXT NOT NULL,
+      api_key       TEXT NOT NULL,
+      model_id      TEXT NOT NULL DEFAULT '',
+      is_default    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- ── Auth sessions ────────────────────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -238,6 +252,29 @@ function runMigrations(db: DB): void {
     );
     CREATE INDEX IF NOT EXISTS idx_agent_integrations_agent ON agent_integrations(agent_id);
 
+    -- ── MCP Servers ────────────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS mcp_servers (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      description   TEXT NOT NULL DEFAULT '',
+      command       TEXT NOT NULL,
+      args          TEXT NOT NULL DEFAULT '[]',
+      env           TEXT NOT NULL DEFAULT '{}',
+      enabled       INTEGER NOT NULL DEFAULT 1,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Agent ↔ MCP Server junction (which MCP servers each agent can use)
+    CREATE TABLE IF NOT EXISTS agent_mcp_servers (
+      agent_id      TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      mcp_server_id TEXT NOT NULL REFERENCES mcp_servers(id) ON DELETE CASCADE,
+      enabled       INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (agent_id, mcp_server_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_mcp_servers_agent ON agent_mcp_servers(agent_id);
+
     -- ── Platform Messages ─────────────────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS platform_messages (
@@ -297,6 +334,7 @@ function runMigrations(db: DB): void {
   addColumnIfNotExists(db, 'users', 'avatar_url', "TEXT NOT NULL DEFAULT ''")
   addColumnIfNotExists(db, 'users', 'bio', "TEXT NOT NULL DEFAULT ''")
   addColumnIfNotExists(db, 'agents', 'account_id', 'TEXT')
+  addColumnIfNotExists(db, 'agents', 'connection_profile_id', 'TEXT')
 }
 
 function seedInitialData(db: DB): void {
@@ -456,6 +494,18 @@ export interface ProviderAccountRow {
   updated_at: string
 }
 
+export interface ConnectionProfileRow {
+  id: string
+  name: string
+  provider_type: string
+  base_url: string
+  api_key: string
+  model_id: string
+  is_default: number
+  created_at: string
+  updated_at: string
+}
+
 export interface PluginRow {
   id: string
   display_name: string
@@ -518,6 +568,24 @@ export interface PlatformMessageRow {
   content: string
   raw_payload: string | null
   created_at: string
+}
+
+export interface McpServerRow {
+  id: string
+  name: string
+  description: string
+  command: string
+  args: string
+  env: string
+  enabled: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AgentMcpServerRow {
+  agent_id: string
+  mcp_server_id: string
+  enabled: number
 }
 
 export interface NotificationRow {

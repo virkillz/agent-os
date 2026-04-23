@@ -10,6 +10,7 @@ import {
   type Schedule,
   type FileEntry,
   type Plugin,
+  type McpServer,
 } from './api.ts'
 
 interface AppState {
@@ -76,6 +77,13 @@ interface AppState {
   loadPlugins: () => Promise<void>
   configurePlugin: (id: string, key: string, value: string) => Promise<void>
   removePluginConfig: (id: string) => Promise<void>
+
+  // MCP Servers
+  mcpServers: McpServer[]
+  loadMcpServers: () => Promise<void>
+  addMcpServer: (data: { name: string; description?: string; command: string; args?: string[]; env?: Record<string, string> }) => Promise<McpServer>
+  updateMcpServer: (id: string, data: { name?: string; description?: string; command?: string; args?: string[]; env?: Record<string, string>; enabled?: boolean }) => Promise<McpServer>
+  deleteMcpServer: (id: string) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -91,6 +99,7 @@ export const useStore = create<AppState>((set, get) => ({
   unreadDmChannels: new Set<string>(),
   workspaceFiles: [],
   plugins: [],
+  mcpServers: [],
 
   // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -314,5 +323,29 @@ export const useStore = create<AppState>((set, get) => ({
     await api.plugins.removeConfigure(id)
     const plugins = await api.plugins.list()
     set({ plugins })
+  },
+
+  // ─── MCP Servers ─────────────────────────────────────────────────────────────
+
+  loadMcpServers: async () => {
+    const mcpServers = await api.mcp.list()
+    set({ mcpServers })
+  },
+
+  addMcpServer: async (data) => {
+    const server = await api.mcp.create(data)
+    set((s) => ({ mcpServers: [...s.mcpServers, server] }))
+    return server
+  },
+
+  updateMcpServer: async (id, data) => {
+    const server = await api.mcp.update(id, data)
+    set((s) => ({ mcpServers: s.mcpServers.map((m) => (m.id === id ? server : m)) }))
+    return server
+  },
+
+  deleteMcpServer: async (id) => {
+    await api.mcp.delete(id)
+    set((s) => ({ mcpServers: s.mcpServers.filter((m) => m.id !== id) }))
   },
 }))

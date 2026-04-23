@@ -14,16 +14,20 @@ import { TerminateSection } from '../components/agent-settings/TerminateSection.
 import { SessionsSection } from '../components/agent-settings/SessionsSection.tsx'
 import { TriggersSection } from '../components/agent-settings/TriggersSection.tsx'
 import { IntegrationsSection } from '../components/agent-settings/IntegrationsSection.tsx'
+import { ConnectionSection } from '../components/agent-settings/ConnectionSection.tsx'
+import { McpSection } from '../components/agent-settings/McpSection.tsx'
 
-type Section = 'profile' | 'avatar' | 'model' | 'skills' | 'platform-tools' | 'plugins' | 'prompt' | 'triggers' | 'integrations' | 'sessions' | 'terminate'
+type Section = 'profile' | 'avatar' | 'connection' | 'model' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'integrations' | 'sessions' | 'terminate'
 
 const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'avatar', label: 'Avatar' },
+  { id: 'connection', label: 'Connection' },
   { id: 'model', label: 'Model' },
   { id: 'skills', label: 'Skills' },
   { id: 'platform-tools', label: 'Platform Tools' },
   { id: 'plugins', label: 'Plugins' },
+  { id: 'mcp', label: 'MCP Servers' },
   { id: 'prompt', label: 'System Prompt' },
   { id: 'triggers', label: 'Triggers' },
   { id: 'integrations', label: 'Integrations' },
@@ -197,10 +201,12 @@ export default function AgentSettings() {
       <div className="flex-1 overflow-hidden flex flex-col">
         {section === 'profile' && <ProfileSection agent={agent} onSave={handleSave} />}
         {section === 'avatar' && <AvatarSection agent={agent} onSave={handleSave} />}
+        {section === 'connection' && <ConnectionSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'model' && <ModelSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'skills' && <SkillsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'platform-tools' && <PlatformToolsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'plugins' && <PluginsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
+        {section === 'mcp' && <McpSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'prompt' && id && <PromptSection agentId={id} />}
         {section === 'triggers' && id && <TriggersSection agentId={id} />}
         {section === 'integrations' && id && <IntegrationsSection agentId={id} />}

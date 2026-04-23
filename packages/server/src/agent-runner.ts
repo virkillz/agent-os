@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
-import { getAgentMemory, getAgentTodos, getAgentRoles, getAllAgents } from './db.js'
+import { getAgentMemory, getAgentTodos, getAgentRoles, getAllAgents, getDb, type ConnectionProfileRow } from './db.js'
 import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
@@ -46,6 +46,7 @@ export interface ModelConfig {
   disabledTools?: string[]
   allowedSkills?: string[]
   accountId?: string
+  connectionProfileId?: string
 }
 
 export interface AgentRecord {
@@ -170,6 +171,19 @@ async function createLiveSession(
 ): Promise<LiveSession> {
   const config = resolveModelConfig(agent.model_config, defaultModel)
 
+  // Check if agent has a connection profile assigned
+  let connectionProfile: ConnectionProfileRow | null = null
+  if (config.connectionProfileId) {
+    connectionProfile = getDb()
+      .prepare('SELECT * FROM connection_profiles WHERE id = ?')
+      .get(config.connectionProfileId) as unknown as ConnectionProfileRow | undefined ?? null
+    if (connectionProfile) {
+      config.provider = connectionProfile.provider_type
+      config.modelId = connectionProfile.model_id || config.modelId
+      if (debugMode) dbg(agent.name, chalk.dim(`connection profile: "${connectionProfile.name}" (${connectionProfile.id})`))
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let model = getModel(config.provider as any, config.modelId as any)
   
@@ -194,6 +208,24 @@ async function createLiveSession(
       maxTokens: 16000,
     } as any
     console.log(`[agent-runner] Using custom OpenRouter model: ${config.modelId}`)
+  }
+
+  // Fallback: if model not found in registry but we have a connection profile with base_url, create custom model
+  if (!model && connectionProfile?.base_url) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model = {
+      id: config.modelId,
+      name: config.modelId,
+      api: 'openai-completions',
+      provider: config.provider,
+      baseUrl: connectionProfile.base_url,
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 16000,
+    } as any
+    console.log(`[agent-runner] Using connection profile model: ${config.provider}/${config.modelId}`)
   }
   
   if (!model) throw new Error(`Model not found: ${config.provider}/${config.modelId}`)
@@ -229,14 +261,19 @@ async function createLiveSession(
   })
   await loader.reload()
 
-  // Resolve provider account — prefer agent's accountId, fall back to env-var auth
-  const account = pickAccount(config.provider, config.accountId)
+  // Resolve provider account — prefer connection profile key, then agent's accountId, fall back to env-var auth
   const authStorage = AuthStorage.inMemory()
-  if (account) {
-    authStorage.setRuntimeApiKey(config.provider, account.api_key)
-    if (debugMode) dbg(agent.name, chalk.dim(`auth: account "${account.label}" (${account.id})`))
-  } else if (debugMode) {
-    dbg(agent.name, chalk.dim('auth: falling back to env var'))
+  if (connectionProfile?.api_key) {
+    authStorage.setRuntimeApiKey(config.provider, connectionProfile.api_key)
+    if (debugMode) dbg(agent.name, chalk.dim(`auth: connection profile key for "${connectionProfile.name}"`))
+  } else {
+    const account = pickAccount(config.provider, config.accountId)
+    if (account) {
+      authStorage.setRuntimeApiKey(config.provider, account.api_key)
+      if (debugMode) dbg(agent.name, chalk.dim(`auth: account "${account.label}" (${account.id})`))
+    } else if (debugMode) {
+      dbg(agent.name, chalk.dim('auth: falling back to env var'))
+    }
   }
 
   const { session } = await createAgentSession({
@@ -251,7 +288,7 @@ async function createLiveSession(
     sessionManager: SessionManager.create(dataDir, sessionsDir),
   })
 
-  const liveSession: LiveSession = { session, unsubscribe: null, accountId: account?.id ?? null }
+  const liveSession: LiveSession = { session, unsubscribe: null, accountId: null }
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     const p = pending.get(agent.id)

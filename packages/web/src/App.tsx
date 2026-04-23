@@ -17,6 +17,7 @@ import SettingsProvider from './pages/settings/Provider.tsx'
 import SettingsProviderAccounts from './pages/settings/ProviderAccounts.tsx'
 import SettingsModel from './pages/settings/Model.tsx'
 import SettingsExtensions from './pages/settings/Extensions.tsx'
+import SettingsMcp from './pages/settings/Mcp.tsx'
 import SettingsSkills from './pages/settings/Skills.tsx'
 import SettingsRoles from './pages/settings/Roles.tsx'
 import SettingsAppearance from './pages/settings/Appearance.tsx'
@@ -140,6 +141,7 @@ export default function App() {
               <Route path="accounts" element={<SettingsProviderAccounts />} />
               <Route path="model" element={<SettingsModel />} />
               <Route path="extensions" element={<SettingsExtensions />} />
+              <Route path="mcp" element={<SettingsMcp />} />
               <Route path="skills" element={<SettingsSkills />} />
               <Route path="roles" element={<SettingsRoles />} />
               <Route path="prompt" element={<SettingsPrompt />} />
