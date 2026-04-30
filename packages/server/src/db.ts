@@ -381,6 +381,7 @@ function runMigrations(db: DB): void {
   addColumnIfNotExists(db, 'agents', 'connection_profile_id', 'TEXT')
   addColumnIfNotExists(db, 'connection_profiles', 'is_vision', 'INTEGER NOT NULL DEFAULT 0')
   addColumnIfNotExists(db, 'platform_messages', 'attachments', "TEXT NOT NULL DEFAULT '[]'")
+  addColumnIfNotExists(db, 'chat_messages', 'attachments', "TEXT NOT NULL DEFAULT '[]'")
 }
 
 function seedInitialData(db: DB): void {

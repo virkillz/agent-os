@@ -80,6 +80,17 @@ export class SlackConnector implements Connector {
     })
   }
 
+  async sendImage(scopeId: string, threadId: string | null, attachment: Attachment): Promise<void> {
+    const buffer = Buffer.from(attachment.data, 'base64')
+    await this.app.client.files.uploadV2({
+      token: this.config.bot_token,
+      channel_id: scopeId,
+      file: buffer,
+      filename: `generated-image.${attachment.mimeType.split('/')[1] ?? 'png'}`,
+      ...(threadId ? { thread_ts: threadId } : {}),
+    })
+  }
+
   async addReaction(externalMsgId: string, emoji: string): Promise<void> {
     // externalMsgId is stored as "channelId:ts"
     const colonIdx = externalMsgId.indexOf(':')

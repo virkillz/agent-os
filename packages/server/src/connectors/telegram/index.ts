@@ -79,6 +79,11 @@ export class TelegramConnector implements Connector {
     await this.bot.telegram.sendMessage(scopeId, toTelegramText(text))
   }
 
+  async sendImage(scopeId: string, _threadId: string | null, attachment: Attachment): Promise<void> {
+    const buffer = Buffer.from(attachment.data, 'base64')
+    await this.bot.telegram.sendPhoto(scopeId, { source: buffer })
+  }
+
   async addReaction(externalMsgId: string, emoji: string): Promise<void> {
     // externalMsgId is stored as "chatId:messageId"
     const colonIdx = externalMsgId.indexOf(':')

@@ -4,7 +4,8 @@
 - [x] add handler so we can send image to agent and it can use vision model to tell what it is. 
 - [ ] ability to read pdf or other text based file. 
 - [ ] ability to transcribe voice. 
-- [ ] connect to jira
+- [ ] connect to jira.
 - [ ] connect to google work space. 
 - [ ] connect to sentry.
 - [ ] connect to github.
+- [ ] Agent should address me by name instead if chief. 

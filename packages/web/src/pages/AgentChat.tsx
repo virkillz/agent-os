@@ -74,12 +74,13 @@ export default function AgentChat() {
     setMessages((prev) => [...prev, userMsg])
 
     try {
-      const { reply } = await api.chat.send(id, msg)
+      const { reply, generatedImages } = await api.chat.send(id, msg)
       const assistantMsg: ChatMessage = {
         id: Date.now() + 1,
         agent_id: id,
         role: 'assistant',
         content: reply,
+        attachments: generatedImages,
         created_at: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, assistantMsg])
@@ -589,9 +590,24 @@ function MessageBubble({
             </div>
           </div>
         ) : (
-          <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
-            {msg.content}
-          </p>
+          <div className="space-y-2">
+            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+              {msg.content}
+            </p>
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {msg.attachments.map((att, i) => (
+                  <img
+                    key={i}
+                    src={`data:${att.mimeType};base64,${att.data}`}
+                    alt="Generated"
+                    className="max-w-full rounded-lg border border-white/10"
+                    style={{ maxHeight: '300px' }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
       <div className="self-start mt-1">{menu}</div>

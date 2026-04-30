@@ -73,13 +73,22 @@ interface LiveSession {
 // Each channel (web, telegram DM, slack channel, etc.) gets its own session.
 const liveSessions = new Map<string, LiveSession>()
 
+export interface AgentResponse {
+  text: string
+  generatedImages: Attachment[]
+}
+
 // Pending resolve callbacks for in-flight chat requests, keyed by liveKey.
-const pending = new Map<string, { chunks: string[]; resolve: (text: string) => void }>()
+const pending = new Map<string, { chunks: string[]; generatedImages: Attachment[]; resolve: (response: AgentResponse) => void }>()
 
 let dataDir = process.cwd()
 
 export function setDataDir(dir: string): void {
   dataDir = dir
+}
+
+export function getDataDir(): string {
+  return dataDir
 }
 
 export function resolveWorkspaceDir(): string {
@@ -315,8 +324,8 @@ async function createLiveSession(
     systemPromptOverride: () => systemPrompt,
     agentsFilesOverride: () => ({ agentsFiles: [] }),
     appendSystemPromptOverride: () => [],
-    // Inject built-in skills so they're available to all agents by default
-    additionalSkillPaths: [BUILTIN_SKILLS_DIR],
+    // Inject built-in and user-installed skills
+    additionalSkillPaths: [BUILTIN_SKILLS_DIR, path.join(dataDir, 'skills')],
     ...(allowedSkills && {
       skillsOverride: (base) => ({
         ...base,
@@ -412,6 +421,14 @@ async function createLiveSession(
         eventBus.emit({ type: 'agent:reply', agentId: agent.id, preview: delta.slice(0, 80) })
       }
     }
+    if (event.type === 'tool_execution_end' && event.result?.content) {
+      const images = event.result.content.filter(
+        (c: any) => c.type === 'image' && c.data && c.mimeType,
+      )
+      for (const img of images) {
+        p.generatedImages.push({ type: 'image', mimeType: img.mimeType, data: img.data })
+      }
+    }
   })
 
   // Pi SDK subscribe may or may not return an unsubscribe fn
@@ -429,7 +446,7 @@ export async function chatWithAgent(
   agent: AgentRecord,
   message: string,
   defaultModel: ModelConfig,
-): Promise<string> {
+): Promise<AgentResponse> {
   return chatWithChannel(agent, 'web:dm:default', 'web', message, defaultModel, 'dm', 'default')
 }
 
@@ -448,7 +465,7 @@ export async function chatWithChannel(
   scopeType?: string,
   scopeId?: string,
   attachments?: Attachment[],
-): Promise<string> {
+): Promise<AgentResponse> {
   let channelSession = getActiveChannelSession(agent.id, channelKey)
   if (!channelSession) {
     channelSession = createChannelSession(agent.id, channelKey, platform, scopeType, scopeId)
@@ -493,7 +510,7 @@ export async function chatWithChannel(
     : undefined
 
   return new Promise((resolve, reject) => {
-    pending.set(liveKey, { chunks: [], resolve })
+    pending.set(liveKey, { chunks: [], generatedImages: [], resolve })
 
     live.session.prompt(message, { streamingBehavior: 'followUp', images })
       .then(() => live.session.agent.waitForIdle())
@@ -502,7 +519,7 @@ export async function chatWithChannel(
         pending.delete(liveKey)
         const text = p?.chunks.join('') ?? ''
         eventBus.emit({ type: 'agent:idle', agentId: agent.id })
-        resolve(text)
+        resolve({ text, generatedImages: p?.generatedImages ?? [] })
       })
       .catch((err: unknown) => {
         pending.delete(liveKey)
@@ -571,7 +588,7 @@ export async function invokeAgent(
   prompt: string,
   defaultModel: ModelConfig,
   opts?: InvokeAgentOpts,
-): Promise<string> {
+): Promise<AgentResponse> {
   return runScheduledTask(agent, prompt, defaultModel, opts)
 }
 
@@ -584,7 +601,7 @@ export async function runScheduledTask(
   taskPrompt: string,
   defaultModel: ModelConfig,
   opts?: InvokeAgentOpts,
-): Promise<string> {
+): Promise<AgentResponse> {
   const workspaceDir = resolveWorkspaceDir()
   const baseSystemPrompt = buildSystemPrompt(agent, workspaceDir, true)
   const systemPrompt = opts?.systemPromptAddendum
@@ -627,11 +644,20 @@ export async function runScheduledTask(
 
   return new Promise((resolve, reject) => {
     const chunks: string[] = []
+    const generatedImages: Attachment[] = []
     const unsubscribe = live.session.subscribe((event: AgentSessionEvent) => {
       if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
         chunks.push(event.assistantMessageEvent.delta)
         if (chunks.length === 1) {
           eventBus.emit({ type: 'agent:reply', agentId: agent.id, preview: chunks[0].slice(0, 80) })
+        }
+      }
+      if (event.type === 'tool_execution_end' && event.result?.content) {
+        const imgs = event.result.content.filter(
+          (c: any) => c.type === 'image' && c.data && c.mimeType,
+        )
+        for (const img of imgs) {
+          generatedImages.push({ type: 'image', mimeType: img.mimeType, data: img.data })
         }
       }
     })
@@ -645,7 +671,7 @@ export async function runScheduledTask(
         if (live.unsubscribe) live.unsubscribe()
         live.mcpCleanup?.().catch(() => {})
         eventBus.emit({ type: 'agent:idle', agentId: agent.id })
-        resolve(chunks.join(''))
+        resolve({ text: chunks.join(''), generatedImages })
       })
       .catch((err: unknown) => {
         if (typeof unsubscribe === 'function') unsubscribe()

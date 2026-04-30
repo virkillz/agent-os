@@ -10,9 +10,18 @@ const TEXT_EXTENSIONS = new Set([
   'log', 'ini', 'conf', 'config',
 ])
 
+const IMAGE_EXTENSIONS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif',
+])
+
 function isTextFile(name: string): boolean {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   return TEXT_EXTENSIONS.has(ext) || !name.includes('.')
+}
+
+function isImageFile(name: string): boolean {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  return IMAGE_EXTENSIONS.has(ext)
 }
 
 function formatBytes(bytes?: number): string {
@@ -240,7 +249,7 @@ export default function Explorer() {
             {selectedNode.type === 'file' && (
               <div className="flex gap-4 mb-4 text-xs text-muted">
                 <span>{formatBytes(selectedNode.size_bytes)}</span>
-                <span>{isTextFile(selectedNode.name) ? 'Text' : 'Binary'}</span>
+                <span>{isTextFile(selectedNode.name) ? 'Text' : isImageFile(selectedNode.name) ? 'Image' : 'Binary'}</span>
               </div>
             )}
 
@@ -343,7 +352,15 @@ export default function Explorer() {
 
             {selectedNode.type === 'file' && !isTextFile(selectedNode.name) && !loading && fileContent == null && (
               <div className="bg-surface-2 border border-border rounded-xl p-6 text-center">
-                <p className="text-sm text-muted">Binary file — download to view</p>
+                {isImageFile(selectedNode.name) ? (
+                  <img
+                    src={api.workspace.downloadUrl(selectedNode.path)}
+                    alt={selectedNode.name}
+                    className="max-w-full max-h-[70vh] mx-auto rounded-lg"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">Binary file — download to view</p>
+                )}
               </div>
             )}
           </div>
@@ -545,7 +562,7 @@ function FileIcon({ name, small }: { name: string; small?: boolean }) {
   const cls = small ? 'w-4 h-4' : 'w-5 h-5'
   const color = ext === 'mp4' || ext === 'mov' ? '#f59e0b'
     : ext === 'mp3' || ext === 'wav' ? '#8b5cf6'
-    : ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' ? '#10b981'
+    : ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'webp' || ext === 'bmp' || ext === 'ico' || ext === 'avif' ? '#10b981'
     : ext === 'md' || ext === 'txt' ? '#6b7280'
     : ext === 'json' ? '#3b82f6'
     : '#6b7280'

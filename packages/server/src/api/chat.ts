@@ -8,6 +8,7 @@ interface MessageRow {
   agent_id: string
   role: 'user' | 'assistant'
   content: string
+  attachments: string
   created_at: string
 }
 
@@ -20,9 +21,13 @@ export function createChatRouter(): Router {
 
   // GET /api/agents/:id/chat — fetch history
   router.get('/:id/chat', (req, res) => {
-    const messages = getDb()
+    const rows = getDb()
       .prepare('SELECT * FROM chat_messages WHERE agent_id = ? ORDER BY created_at ASC')
       .all(req.params.id) as unknown as MessageRow[]
+    const messages = rows.map((r) => ({
+      ...r,
+      attachments: JSON.parse(r.attachments || '[]'),
+    }))
     res.json(messages)
   })
 
@@ -61,21 +66,22 @@ export function createChatRouter(): Router {
         source: agent.source,
       }
 
-      const reply = await chatWithAgent(agentRecord, message.trim(), getFallbackModel())
+      const response = await chatWithAgent(agentRecord, message.trim(), getFallbackModel())
 
       // Persist assistant reply
+      const attachmentsJson = JSON.stringify(response.generatedImages)
       getDb()
-        .prepare('INSERT INTO chat_messages (agent_id, role, content) VALUES (?, ?, ?)')
-        .run(agent.id, 'assistant', reply)
+        .prepare('INSERT INTO chat_messages (agent_id, role, content, attachments) VALUES (?, ?, ?, ?)')
+        .run(agent.id, 'assistant', response.text, attachmentsJson)
 
       getDb().prepare(`
         INSERT INTO platform_messages
           (agent_id, platform, message_type, direction, scope_type, scope_id,
-           sender_id, sender_name, sender_type, content)
-        VALUES (?, 'web', 'message', 'outbound', 'dm', 'default', ?, ?, 'agent', ?)
-      `).run(agent.id, agent.id, agent.name, reply)
+           sender_id, sender_name, sender_type, content, attachments)
+        VALUES (?, 'web', 'message', 'outbound', 'dm', 'default', ?, ?, 'agent', ?, ?)
+      `).run(agent.id, agent.id, agent.name, response.text, attachmentsJson)
 
-      res.json({ reply })
+      res.json({ reply: response.text, generatedImages: response.generatedImages })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[chat] Error for agent ${agent.name} (${agent.id}):`, err)

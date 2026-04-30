@@ -89,7 +89,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
   const attachments = payload.attachments
 
   try {
-    let response: string
+    let response: { text: string; generatedImages: Attachment[] }
     if (ctx) {
       // Platform message (Telegram/Slack): use the persistent channel session so the
       // agent has full conversation memory. Prepend a compact header with sender info
@@ -113,12 +113,16 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
       `).run(
         row.agent_id, ctx.platform,
         ctx.scopeType, ctx.scopeId, ctx.threadId,
-        row.agent_id, agent.name, response,
+        row.agent_id, agent.name, response.text,
       )
 
       const connector = connectorLoader.getConnector(row.agent_id, ctx.platform)
       if (connector) {
-        await connector.sendMessage(ctx.scopeId, ctx.threadId, response)
+        await connector.sendMessage(ctx.scopeId, ctx.threadId, response.text)
+        // Send any generated images after the text message
+        for (const img of response.generatedImages) {
+          await connector.sendImage(ctx.scopeId, ctx.threadId, img)
+        }
       } else {
         console.warn(chalk.yellow('[queue-worker]'), `no active connector for ${ctx.platform}, agent ${row.agent_id}`)
       }

@@ -1,0 +1,13 @@
+{
+  "id": "stable-diffusion",
+  "displayName": "Stable Diffusion",
+  "description": "Image generation via any SDAPI-compatible backend such as Automatic1111, Draw Things, etc.",
+  "env": [
+    {
+      "key": "STABLE_DIFFUSION_API_URL",
+      "required": true,
+      "description": "Base URL of the SDAPI-compatible backend (e.g. https://virkill-image.ngrok.dev)"
+    }
+  ],
+  "toolIds": ["generate_image"]
+}

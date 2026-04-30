@@ -9,6 +9,7 @@ export interface Connector {
   start(): Promise<void>
   stop(): Promise<void>
   sendMessage(scopeId: string, threadId: string | null, text: string): Promise<void>
+  sendImage(scopeId: string, threadId: string | null, attachment: Attachment): Promise<void>
   addReaction(externalMsgId: string, emoji: string): Promise<void>
 }
 

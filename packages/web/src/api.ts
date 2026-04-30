@@ -87,7 +87,7 @@ export const api = {
   chat: {
     history: (agentId: string) => req<ChatMessage[]>('GET', `/agents/${agentId}/chat`),
     send: (agentId: string, message: string) =>
-      req<{ reply: string }>('POST', `/agents/${agentId}/chat`, { message }),
+      req<{ reply: string; generatedImages?: Array<{ type: string; mimeType: string; data: string }> }>('POST', `/agents/${agentId}/chat`, { message }),
     clear: (agentId: string) => req<{ ok: boolean }>('DELETE', `/agents/${agentId}/chat`),
     editMessage: (agentId: string, msgId: number, content: string) =>
       req<{ ok: boolean }>('PATCH', `/agents/${agentId}/chat/${msgId}`, { content }),
@@ -387,6 +387,7 @@ export interface ChatMessage {
   agent_id: string
   role: 'user' | 'assistant'
   content: string
+  attachments?: Array<{ type: string; mimeType: string; data: string }>
   created_at: string
 }
 

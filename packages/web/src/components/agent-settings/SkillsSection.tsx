@@ -23,8 +23,8 @@ export function SkillsSection({
     try {
       let next: string[] | undefined
       if (currentlyEnabled) {
-        const all = skills.map((s) => s.name)
-        next = all.filter((n) => n !== skillName)
+        const current = allowedSkills ?? skills.map((s) => s.name)
+        next = current.filter((n) => n !== skillName)
         if (next.length === 0) next = undefined
       } else {
         const current = allowedSkills ?? []

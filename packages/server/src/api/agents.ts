@@ -2,8 +2,10 @@ import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { loadSkillsFromDir } from '@mariozechner/pi-coding-agent'
 import { getDb, getAgentChannelSessions } from '../db.js'
-import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir } from '../agent-runner.js'
+import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir, getDataDir } from '../agent-runner.js'
+import { getMcpToolsForAgent } from '../mcp-client.js'
 
 export interface AgentRow {
   id: string

@@ -8,6 +8,7 @@ const PLUGIN_ICONS: Record<string, string> = {
   'gemini-image':  '🖼️',
   youtube:         '▶️',
   remotion:        '🎬',
+  'stable-diffusion': '🎨',
 }
 
 export default function SettingsExtensions() {
