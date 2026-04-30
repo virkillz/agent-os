@@ -242,33 +242,6 @@ export const api = {
       req<{ ok: boolean }>('POST', '/notifications/read-all'),
   },
 
-  // ─── Channels ─────────────────────────────────────────────────────────────
-
-  channels: {
-    list: () => req<Channel[]>('GET', '/channels'),
-    listDms: () => req<DmChannel[]>('GET', '/channels/dms'),
-    publicChannel: () => req<Channel>('GET', '/channels/public'),
-    create: (name: string) => req<Channel>('POST', '/channels', { name }),
-    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/channels/${id}`),
-    messages: (channelId: string, limit = 100) =>
-      req<ChannelMessage[]>('GET', `/channels/${channelId}/messages?limit=${limit}`),
-    send: (channelId: string, content: string) =>
-      req<{ id: number }>('POST', `/channels/${channelId}/messages`, { content }),
-    getDm: (partnerId: string) => req<Channel>('GET', `/channels/dm/${partnerId}`),
-    sendDm: (channelId: string, content: string) =>
-      req<{ id: number }>('POST', `/channels/dm/${channelId}/messages`, { content }),
-    editMessage: (channelId: string, msgId: number, content: string) =>
-      req<{ ok: boolean }>('PATCH', `/channels/${channelId}/messages/${msgId}`, { content }),
-    deleteMessage: (channelId: string, msgId: number) =>
-      req<{ ok: boolean }>('DELETE', `/channels/${channelId}/messages/${msgId}`),
-    members: (channelId: string) =>
-      req<{ id: string; name: string; role: string; avatar_color: string }[]>('GET', `/channels/${channelId}/members`),
-    addMember: (channelId: string, agentId: string) =>
-      req<{ ok: boolean }>('POST', `/channels/${channelId}/members`, { agentId }),
-    removeMember: (channelId: string, agentId: string) =>
-      req<{ ok: boolean }>('DELETE', `/channels/${channelId}/members/${agentId}`),
-  },
-
   // ─── Provider Accounts ────────────────────────────────────────────────────
 
   connectionProfiles: {
@@ -560,29 +533,6 @@ export interface BoardFull extends Board {
   lanes: Lane[]
   cards: Card[]
   rules: LaneRule[]
-}
-
-export interface Channel {
-  id: string
-  name: string
-  is_dm: number
-  created_at: string
-}
-
-export interface DmChannel extends Channel {
-  partner_id: string
-  partner_name: string
-  partner_type: 'agent' | 'user'
-  partner_avatar_color: string
-}
-
-export interface ChannelMessage {
-  id: number
-  channel_id: string
-  sender_id: string
-  sender_type: 'agent' | 'user'
-  content: string
-  created_at: string
 }
 
 export interface Notification {

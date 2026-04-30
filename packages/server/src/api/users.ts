@@ -220,7 +220,7 @@ export function createSetupRouter(): Router {
     const db = getDb()
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
       'platform_prompt',
-      'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.',
+      'You are an AI agent. You have access to the working directory at {working_directory}.',
     )
 
     const user = getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as UserRow

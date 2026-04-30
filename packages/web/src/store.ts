@@ -63,11 +63,6 @@ interface AppState {
   markAllNotificationsRead: () => Promise<void>
   clearNotifications: () => void
 
-  // Unread DM channels (set of channel IDs with unread messages)
-  unreadDmChannels: Set<string>
-  addUnreadDm: (channelId: string) => void
-  markDmRead: (channelId: string) => void
-
   // Workspace
   workspaceFiles: FileEntry[]
   loadWorkspace: () => Promise<void>
@@ -97,7 +92,6 @@ export const useStore = create<AppState>((set, get) => ({
   schedules: {},
   notifications: [],
   notificationsLoaded: false,
-  unreadDmChannels: new Set<string>(),
   workspaceFiles: [],
   plugins: [],
   mcpServers: [],
@@ -279,24 +273,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   clearNotifications: () => {
     set({ notifications: [] })
-  },
-
-  // ─── Unread DMs ─────────────────────────────────────────────────────────────
-
-  addUnreadDm: (channelId) => {
-    set((s) => {
-      const next = new Set(s.unreadDmChannels)
-      next.add(channelId)
-      return { unreadDmChannels: next }
-    })
-  },
-
-  markDmRead: (channelId) => {
-    set((s) => {
-      const next = new Set(s.unreadDmChannels)
-      next.delete(channelId)
-      return { unreadDmChannels: next }
-    })
   },
 
   // ─── Workspace ──────────────────────────────────────────────────────────────

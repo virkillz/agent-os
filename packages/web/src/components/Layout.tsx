@@ -1,38 +1,17 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useStore } from '../store.ts'
-import { useAppEvents } from '../hooks/useAppEvents.ts'
-import { api } from '../api.ts'
-
 interface LayoutProps {
   currentUser: import('../api.ts').User | null
   onLogout: () => void
 }
 
 export default function Layout({ currentUser, onLogout }: LayoutProps) {
-  const { loadAgents, unreadDmChannels, addUnreadDm } = useStore()
+  const { loadAgents } = useStore()
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => { loadAgents() }, [loadAgents])
-
-  // Track unread DMs from agent send_direct_message calls
-  useAppEvents(async (event) => {
-    if (event.type === 'channel:message' && event.senderType === 'agent') {
-      // Only count as unread if not on the channels page
-      if (!location.pathname.startsWith('/channels')) {
-        // Check if it's a DM channel (we check via API)
-        try {
-          const dms = await api.channels.listDms()
-          if (dms.some((d) => d.id === event.channelId)) {
-            addUnreadDm(event.channelId)
-          }
-        } catch { /* ignore */ }
-      }
-    }
-  })
-
-  const unreadDmCount = unreadDmChannels.size
 
   const isDashboard = location.pathname === '/dashboard' || location.pathname === '/'
 
@@ -57,18 +36,6 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
         >
           {/* Left: Back + Logo */}
           <div className="flex items-center gap-2 min-w-0">
-            {!isDashboard && (
-              <button
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-1 text-xs font-medium mr-2 transition-opacity hover:opacity-100"
-                style={{ color: 'var(--muted)' }}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                </svg>
-                Back
-              </button>
-            )}
             <button
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-2.5 transition-opacity hover:opacity-85"
@@ -112,32 +79,6 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
                 </span>
               </div>
             )}
-
-            {/* DM inbox icon with unread badge */}
-            <button
-              onClick={() => navigate('/channels')}
-              className="relative flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80 active:scale-95"
-              style={{ color: 'var(--muted)', padding: '4px' }}
-              title="Direct Messages"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-              </svg>
-              {unreadDmCount > 0 && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full text-[9px] font-bold"
-                  style={{
-                    minWidth: '14px',
-                    height: '14px',
-                    background: 'rgb(239, 68, 68)',
-                    color: '#fff',
-                    padding: '0 3px',
-                  }}
-                >
-                  {unreadDmCount > 9 ? '9+' : unreadDmCount}
-                </span>
-              )}
-            </button>
 
             {/* Settings icon */}
             <button

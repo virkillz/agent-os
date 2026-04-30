@@ -21,7 +21,6 @@ import SettingsAppearance from './pages/settings/Appearance.tsx'
 import SettingsPrompt from './pages/settings/Prompt.tsx'
 import Workspace from './pages/Workspace.tsx'
 import Board from './pages/Board.tsx'
-import Channels from './pages/Channels.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import Users from './pages/Users.tsx'
 import Notifications from './pages/Notifications.tsx'
@@ -102,8 +101,6 @@ export default function App() {
           <Route element={<Layout currentUser={currentUser} onLogout={async () => { await api.auth.logout(); setCurrentUser(null); setAuthState('unauthenticated') }} />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/channels" element={<Channels />} />
-            <Route path="/channels/:id" element={<Channels />} />
             <Route path="/board" element={<Board />} />
             <Route path="/roster" element={<Roster />} />
             <Route path="/users" element={<Users />} />

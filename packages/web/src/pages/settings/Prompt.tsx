@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../../store.ts'
 
 const DEFAULT_PLATFORM_PROMPT =
-  'You are an AI agent. You have access to the working directory at {working_directory}. Follow the Standard Operating Procedure in SOP.md and your job description.'
+  'You are an AI agent. You have access to the working directory at {working_directory}.'
 
 export default function SettingsPrompt() {
   const { settings, updateSettings } = useStore()

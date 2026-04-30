@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
 import {
-  getAgentMemory, getAgentTodos, getDb,
+  getAgentMemory, getAgentTodos, getDb, getSetting,
   getActiveChannelSession, createChannelSession, endChannelSession,
   type ConnectionProfileRow,
 } from './db.js'
@@ -94,8 +94,16 @@ export function buildSystemPrompt(
   workspaceDir: string,
   includeTodos = false,
 ): string {
-  // ── Layer 1: Identity prompt ─────────────────────────────────────────────
   const projectDir = path.dirname(workspaceDir)
+
+  // ── Layer 0: Platform prompt (global base prompt) ────────────────────────
+  const platformPromptRaw = getSetting('platform_prompt') ?? 'You are an AI agent. You have access to the working directory at {working_directory}.'
+  const platformBlock = platformPromptRaw
+    .replace(/{working_directory}/g, workspaceDir)
+    .replace(/{project_dir}/g, projectDir)
+    .trim()
+
+  // ── Layer 1: Identity prompt ─────────────────────────────────────────────
   const identityBlock = agent.system_prompt
     .trim()
     .replace(/{working_directory}/g, workspaceDir)
@@ -146,7 +154,7 @@ export function buildSystemPrompt(
     `## How You Work\n\nAs a virtual employee, here is how you operate.\n\n` +
     toolSections.join('\n\n')
 
-  return [identityBlock, toolsBlock, memoryBlock, todoBlock]
+  return [platformBlock, identityBlock, toolsBlock, memoryBlock, todoBlock]
     .filter(Boolean)
     .join('\n\n')
 }
