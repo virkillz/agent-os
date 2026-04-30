@@ -334,7 +334,7 @@ export default function SettingsProvider() {
                     <div
                       className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-10 max-h-48 overflow-y-auto"
                       style={{
-                        background: 'rgba(8,18,40,0.95)',
+                        background: 'rgb(var(--s1) / 0.95)',
                         border: '1px solid rgba(255,255,255,0.12)',
                         backdropFilter: 'blur(16px)',
                         boxShadow: '0 8px 24px rgba(0,0,0,0.5)',

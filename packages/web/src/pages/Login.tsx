@@ -94,18 +94,18 @@ export default function Login({ onLogin }: LoginProps) {
           border-radius: 8px;
           padding: 10px 14px;
           font-size: 13px;
-          color: rgba(200, 220, 235, 0.9);
+          color: rgb(var(--subtle) / 0.9);
           outline: none;
           transition: border-color 300ms, box-shadow 300ms, background 300ms;
           letter-spacing: 0.03em;
         }
         .login-input::placeholder {
-          color: rgba(130, 160, 185, 0.3);
+          color: rgb(var(--muted) / 0.3);
         }
         .login-input:focus {
           background: rgba(12, 30, 52, 0.75);
-          border-color: rgba(100, 210, 230, 0.5);
-          box-shadow: 0 0 0 3px rgba(80, 200, 220, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+          border-color: rgb(var(--accent) / 0.5);
+          box-shadow: 0 0 0 3px rgb(var(--accent) / 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
         }
         .login-btn {
           width: 100%;
@@ -119,14 +119,14 @@ export default function Login({ onLogin }: LoginProps) {
           transition: all 300ms;
           position: relative;
           overflow: hidden;
-          background: rgba(20, 60, 80, 0.65);
-          border: 1.5px solid rgba(100, 210, 230, 0.5);
-          color: #e8f4f8;
-          box-shadow: 0 0 20px rgba(80, 200, 220, 0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+          background: rgb(var(--s2) / 0.65);
+          border: 1.5px solid rgb(var(--accent) / 0.5);
+          color: var(--text-primary);
+          box-shadow: 0 0 20px rgb(var(--accent) / 0.12), inset 0 1px 0 rgba(255,255,255,0.06);
         }
         .login-btn:hover:not(:disabled) {
           background: rgba(25, 75, 100, 0.75);
-          box-shadow: 0 0 30px rgba(80, 200, 220, 0.2), inset 0 1px 0 rgba(255,255,255,0.08);
+          box-shadow: 0 0 30px rgb(var(--accent) / 0.2), inset 0 1px 0 rgba(255,255,255,0.08);
           transform: translateY(-1px);
         }
         .login-btn:active:not(:disabled) {
@@ -142,7 +142,7 @@ export default function Login({ onLogin }: LoginProps) {
           left: 0;
           right: 0;
           height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.6), transparent);
+          background: linear-gradient(90deg, transparent, rgb(var(--accent) / 0.6), transparent);
         }
       `}</style>
 
@@ -151,7 +151,7 @@ export default function Login({ onLogin }: LoginProps) {
         <div
           className="fixed inset-0 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse 60% 40% at 50% 60%, rgba(30, 80, 110, 0.15) 0%, transparent 70%)',
+            background: 'radial-gradient(ellipse 60% 40% at 50% 60%, rgb(var(--s2) / 0.15) 0%, transparent 70%)',
           }}
         />
 
@@ -164,18 +164,18 @@ export default function Login({ onLogin }: LoginProps) {
           <div
             className="rounded-xl p-8 space-y-6 relative overflow-hidden"
             style={{
-              background: 'rgba(12, 30, 50, 0.85)',
+              background: 'rgb(var(--s1) / 0.85)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 0 30px rgba(80, 200, 220, 0.08), 0 24px 64px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
+              boxShadow: '0 0 30px rgb(var(--accent) / 0.08), 0 24px 64px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}
           >
             {/* Top glow line */}
             <div
               className="absolute top-0 left-0 right-0 h-[2px]"
               style={{
-                background: 'linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.6), transparent)',
+                background: 'linear-gradient(90deg, transparent, rgb(var(--accent) / 0.6), transparent)',
                 animation: 'glowPulse 3s ease-in-out infinite',
               }}
             />
@@ -186,8 +186,8 @@ export default function Login({ onLogin }: LoginProps) {
                 <div
                   className="rounded-xl overflow-hidden transition-all duration-300"
                   style={{
-                    border: '1px solid rgba(100, 210, 230, 0.15)',
-                    boxShadow: '0 0 20px rgba(80, 200, 220, 0.1)',
+                    border: '1px solid rgb(var(--accent) / 0.15)',
+                    boxShadow: '0 0 20px rgb(var(--accent) / 0.1)',
                   }}
                 >
                   <img src="/logo.png" alt="Logo" className="w-24 h-24 object-cover" />
@@ -195,14 +195,14 @@ export default function Login({ onLogin }: LoginProps) {
               </div>
               <div
                 className="font-bold text-3xl mt-4 tracking-[0.15em]"
-                style={{ color: '#e8f4f8' }}
+                style={{ color: 'var(--text-primary)' }}
               >
                 Agent OS
               </div>
               <p
                 className="text-[11px] mt-3 leading-relaxed px-2"
                 style={{
-                  color: 'rgba(130, 160, 185, 0.5)',
+                  color: 'rgb(var(--muted) / 0.5)',
                   fontStyle: 'italic',
                   letterSpacing: '0.02em',
                 }}
@@ -218,8 +218,8 @@ export default function Login({ onLogin }: LoginProps) {
                   className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]"
                   style={{
                     color: focusedField === 'username'
-                      ? 'rgba(140, 200, 220, 0.85)'
-                      : 'rgba(140, 200, 220, 0.6)',
+                      ? 'rgb(var(--accent) / 0.85)'
+                      : 'rgb(var(--accent) / 0.6)',
                     transition: 'color 300ms',
                   }}
                 >
@@ -243,8 +243,8 @@ export default function Login({ onLogin }: LoginProps) {
                   className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]"
                   style={{
                     color: focusedField === 'password'
-                      ? 'rgba(140, 200, 220, 0.85)'
-                      : 'rgba(140, 200, 220, 0.6)',
+                      ? 'rgb(var(--accent) / 0.85)'
+                      : 'rgb(var(--accent) / 0.6)',
                     transition: 'color 300ms',
                   }}
                 >
@@ -276,7 +276,7 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="text-center pt-2">
               <span
                 className="text-[10px] tracking-[0.15em] uppercase"
-                style={{ color: 'rgba(130, 160, 185, 0.3)' }}
+                style={{ color: 'rgb(var(--muted) / 0.3)' }}
               >
                 Secure Authentication
               </span>

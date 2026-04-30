@@ -202,7 +202,7 @@ export function TriggersSection({ agentId }: { agentId: string }) {
         <div
           className="w-full max-w-4xl rounded-2xl p-6 animate-zoom-in"
           style={{
-            background: 'rgba(8,18,40,0.90)',
+            background: 'rgb(var(--s1) / 0.90)',
             border: '1px solid rgba(255,255,255,0.10)',
             backdropFilter: 'blur(14px)',
           }}

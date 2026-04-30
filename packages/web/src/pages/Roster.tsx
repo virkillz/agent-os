@@ -51,29 +51,29 @@ export default function Roster() {
             className="group flex flex-col items-center justify-center gap-3 rounded-xl transition-all duration-300"
             style={{
               height: '260px',
-              background: 'rgba(12, 30, 50, 0.35)',
-              border: '2px dashed rgba(100, 210, 230, 0.12)',
+              background: 'rgb(var(--s1) / 0.35)',
+              border: '2px dashed rgb(var(--accent) / 0.12)',
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.35)'
-              e.currentTarget.style.background = 'rgba(20, 60, 80, 0.3)'
+              e.currentTarget.style.borderColor = 'rgb(var(--accent) / 0.35)'
+              e.currentTarget.style.background = 'rgb(var(--s2) / 0.3)'
               e.currentTarget.style.transform = 'translateY(-2px)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.12)'
-              e.currentTarget.style.background = 'rgba(12, 30, 50, 0.35)'
+              e.currentTarget.style.borderColor = 'rgb(var(--accent) / 0.12)'
+              e.currentTarget.style.background = 'rgb(var(--s1) / 0.35)'
               e.currentTarget.style.transform = 'translateY(0)'
             }}
           >
             <Plus
               size={28}
               className="transition-colors duration-300"
-              style={{ color: 'rgba(100, 210, 230, 0.35)' }}
+              style={{ color: 'rgb(var(--accent) / 0.35)' }}
             />
             <span
               className="text-[10px] font-bold tracking-[0.15em] uppercase transition-colors duration-300"
-              style={{ color: 'rgba(130, 160, 185, 0.45)' }}
+              style={{ color: 'rgb(var(--muted) / 0.45)' }}
             >
               New Agent
             </span>
@@ -122,7 +122,7 @@ function AgentTile({ agent, status, onClick }: {
       className="group flex flex-col items-center justify-end rounded-xl transition-all duration-300 text-center relative overflow-hidden"
       style={{
         height: '260px',
-        background: 'rgba(12, 30, 50, 0.55)',
+        background: 'rgb(var(--s1) / 0.55)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         border: '1px solid rgba(255,255,255,0.08)',
@@ -131,16 +131,16 @@ function AgentTile({ agent, status, onClick }: {
         paddingBottom: '24px',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.5)'
+        e.currentTarget.style.borderColor = 'rgb(var(--accent) / 0.5)'
         e.currentTarget.style.borderWidth = '1.5px'
-        e.currentTarget.style.background = 'rgba(20, 60, 80, 0.65)'
-        e.currentTarget.style.boxShadow = '0 0 30px rgba(80, 200, 220, 0.15), inset 0 1px 0 rgba(255,255,255,0.08)'
+        e.currentTarget.style.background = 'rgb(var(--s2) / 0.65)'
+        e.currentTarget.style.boxShadow = '0 0 30px rgb(var(--accent) / 0.15), inset 0 1px 0 rgba(255,255,255,0.08)'
         e.currentTarget.style.transform = 'translateY(-4px)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
         e.currentTarget.style.borderWidth = '1px'
-        e.currentTarget.style.background = 'rgba(12, 30, 50, 0.55)'
+        e.currentTarget.style.background = 'rgb(var(--s1) / 0.55)'
         e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.04)'
         e.currentTarget.style.transform = 'translateY(0)'
       }}
@@ -148,7 +148,7 @@ function AgentTile({ agent, status, onClick }: {
       {/* Top glow line on hover */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.6), transparent)' }}
+        style={{ background: 'linear-gradient(90deg, transparent, rgb(var(--accent) / 0.6), transparent)' }}
       />
 
       {/* Avatar — centered in the upper area */}
@@ -160,7 +160,7 @@ function AgentTile({ agent, status, onClick }: {
               alt={agent.name}
               className="w-24 h-24 rounded-xl object-cover transition-all duration-300"
               style={{
-                border: '2px solid rgba(100, 210, 230, 0.12)',
+                border: '2px solid rgb(var(--accent) / 0.12)',
                 filter: 'none',
               }}
             />
@@ -168,9 +168,9 @@ function AgentTile({ agent, status, onClick }: {
             <div
               className="w-24 h-24 rounded-xl flex items-center justify-center text-3xl font-bold transition-all duration-300"
               style={{
-                backgroundColor: 'rgba(100, 210, 230, 0.08)',
-                border: '2px solid rgba(100, 210, 230, 0.15)',
-                color: 'rgba(140, 220, 235, 0.7)',
+                backgroundColor: 'rgb(var(--accent) / 0.08)',
+                border: '2px solid rgb(var(--accent) / 0.15)',
+                color: 'rgb(var(--accent) / 0.7)',
               }}
             >
               {agent.name[0].toUpperCase()}
@@ -181,7 +181,7 @@ function AgentTile({ agent, status, onClick }: {
             className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full ${status === 'thinking' ? 'animate-pulse' : ''}`}
             style={{
               background: dotColor,
-              border: '2.5px solid rgba(12, 30, 50, 0.9)',
+              border: '2.5px solid rgb(var(--s1) / 0.9)',
             }}
           />
         </div>
@@ -190,7 +190,7 @@ function AgentTile({ agent, status, onClick }: {
       {/* Name */}
       <div
         className="text-sm font-bold truncate tracking-[0.2em] transition-colors duration-300 mb-1 px-3 w-full"
-        style={{ color: 'rgba(200, 220, 235, 0.85)' }}
+        style={{ color: 'rgb(var(--subtle) / 0.85)' }}
       >
         {agent.name.toUpperCase()}
       </div>
@@ -198,7 +198,7 @@ function AgentTile({ agent, status, onClick }: {
       {/* Role */}
       <div
         className="text-[10px] leading-tight text-center tracking-wider uppercase transition-colors duration-300 px-4 whitespace-pre-line"
-        style={{ color: 'rgba(130, 160, 185, 0.5)' }}
+        style={{ color: 'rgb(var(--muted) / 0.5)' }}
       >
         {agent.role}
       </div>
@@ -261,22 +261,22 @@ function HireForm({ onAdd, onCancel, canCancel }: {
     <div
       className="rounded-xl p-5 relative overflow-hidden"
       style={{
-        background: 'rgba(10, 22, 45, 0.85)',
+        background: 'rgb(var(--s1) / 0.85)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(100, 210, 230, 0.1)',
+        border: '1px solid rgb(var(--accent) / 0.1)',
       }}
     >
       {/* Top glow */}
       <div
         className="absolute top-0 left-0 right-0 h-[1px]"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.25), transparent)' }}
+        style={{ background: 'linear-gradient(90deg, transparent, rgb(var(--accent) / 0.25), transparent)' }}
       />
 
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-sm font-bold tracking-[0.1em] uppercase" style={{ color: 'var(--text-primary)' }}>New AI Agent</h2>
-          <p className="text-[11px] mt-0.5 tracking-wide" style={{ color: 'rgba(130, 160, 185, 0.5)' }}>Configure your new agent</p>
+          <p className="text-[11px] mt-0.5 tracking-wide" style={{ color: 'rgb(var(--muted) / 0.5)' }}>Configure your new agent</p>
         </div>
         {canCancel && (
           <button className="btn-ghost text-xs tracking-wider uppercase" onClick={onCancel}>Cancel</button>
@@ -285,14 +285,14 @@ function HireForm({ onAdd, onCancel, canCancel }: {
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgba(140, 200, 220, 0.6)' }}>
-            Name <span style={{ color: 'rgba(100, 210, 230, 0.7)' }}>*</span>
+          <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgb(var(--accent) / 0.6)' }}>
+            Name <span style={{ color: 'rgb(var(--accent) / 0.7)' }}>*</span>
           </label>
           <input className="input" placeholder="Alex" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
         <div>
-          <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgba(140, 200, 220, 0.6)' }}>
-            Role <span style={{ color: 'rgba(100, 210, 230, 0.7)' }}>*</span>
+          <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgb(var(--accent) / 0.6)' }}>
+            Role <span style={{ color: 'rgb(var(--accent) / 0.7)' }}>*</span>
           </label>
           <input
             className="input"
@@ -308,15 +308,15 @@ function HireForm({ onAdd, onCancel, canCancel }: {
       </div>
 
       <div className="mb-3">
-        <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgba(140, 200, 220, 0.6)' }}>
-          Description <span className="font-normal normal-case tracking-normal" style={{ color: 'rgba(130, 160, 185, 0.4)' }}>(optional)</span>
+        <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgb(var(--accent) / 0.6)' }}>
+          Description <span className="font-normal normal-case tracking-normal" style={{ color: 'rgb(var(--muted) / 0.4)' }}>(optional)</span>
         </label>
         <input className="input" placeholder="A short bio..." value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
 
       <div className="mb-4">
-        <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgba(140, 200, 220, 0.6)' }}>
-          System Prompt <span className="font-normal normal-case tracking-normal" style={{ color: 'rgba(130, 160, 185, 0.4)' }}>(optional)</span>
+        <label className="block text-[10px] font-bold mb-1.5 uppercase tracking-[0.15em]" style={{ color: 'rgb(var(--accent) / 0.6)' }}>
+          System Prompt <span className="font-normal normal-case tracking-normal" style={{ color: 'rgb(var(--muted) / 0.4)' }}>(optional)</span>
         </label>
         <textarea
           className="input resize-none h-24 font-mono text-xs"

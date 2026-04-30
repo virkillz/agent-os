@@ -21,7 +21,7 @@ export default function AgentDetailModal({ agent, onClose }: { agent: Agent; onC
       <div
         className="relative w-80 rounded-2xl p-6 shadow-2xl"
         style={{
-          background: 'rgba(8,18,40,0.97)',
+          background: 'rgb(var(--s1) / 0.97)',
           border: '1px solid rgba(255,255,255,0.12)',
         }}
         onClick={(e) => e.stopPropagation()}

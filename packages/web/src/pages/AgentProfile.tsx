@@ -29,21 +29,21 @@ export default function AgentProfile() {
       label: 'Chat',
       sublabel: 'Message this agent',
       onClick: () => navigate(`/agents/${id}/chat`),
-      color: 'rgba(100, 210, 230, 0.8)',
+      color: 'rgb(var(--accent) / 0.8)',
     },
     {
       icon: Brain,
       label: 'Memory',
       sublabel: 'View agent memory',
       onClick: () => navigate(`/agents/${id}/memory`),
-      color: 'rgba(140, 180, 255, 0.8)',
+      color: 'rgb(var(--accent) / 0.8)',
     },
     {
       icon: CheckSquare,
       label: 'Todo',
       sublabel: 'Manage tasks',
       onClick: () => navigate(`/agents/${id}/todos`),
-      color: 'rgba(120, 220, 180, 0.8)',
+      color: 'rgb(var(--accent) / 0.8)',
     },
     {
       icon: Calendar,
@@ -104,18 +104,18 @@ function MenuCard({ icon: Icon, label, sublabel, color, onClick }: {
     <button
       className="group flex flex-col items-center justify-center gap-4 rounded-xl py-8 px-6 transition-all duration-300 relative overflow-hidden"
       style={{
-        background: 'rgba(12, 30, 50, 0.5)',
-        border: '1px solid rgba(100, 210, 230, 0.12)',
+        background: 'rgb(var(--s1) / 0.5)',
+        border: '1px solid rgb(var(--accent) / 0.12)',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(20, 60, 80, 0.6)'
-        e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.35)'
+        e.currentTarget.style.background = 'rgb(var(--s2) / 0.6)'
+        e.currentTarget.style.borderColor = 'rgb(var(--accent) / 0.35)'
         e.currentTarget.style.transform = 'translateY(-4px)'
         e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(12, 30, 50, 0.5)'
-        e.currentTarget.style.borderColor = 'rgba(100, 210, 230, 0.12)'
+        e.currentTarget.style.background = 'rgb(var(--s1) / 0.5)'
+        e.currentTarget.style.borderColor = 'rgb(var(--accent) / 0.12)'
         e.currentTarget.style.transform = 'translateY(0)'
         e.currentTarget.style.boxShadow = 'none'
       }}
@@ -142,13 +142,13 @@ function MenuCard({ icon: Icon, label, sublabel, color, onClick }: {
       <div>
         <div
           className="text-base font-bold tracking-[0.1em] uppercase mb-1"
-          style={{ color: 'rgba(200, 220, 235, 0.9)' }}
+          style={{ color: 'rgb(var(--subtle) / 0.9)' }}
         >
           {label}
         </div>
         <div
           className="text-[11px] tracking-wide"
-          style={{ color: 'rgba(130, 160, 185, 0.5)' }}
+          style={{ color: 'rgb(var(--muted) / 0.5)' }}
         >
           {sublabel}
         </div>

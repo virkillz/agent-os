@@ -101,7 +101,7 @@ function McpServerRow({
   return (
     <div
       className={`flex items-center gap-3 rounded-lg px-4 py-3 ${globallyDisabled ? 'opacity-40' : ''}`}
-      style={{ background: 'rgba(8,18,40,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
+      style={{ background: 'rgb(var(--s1) / 0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

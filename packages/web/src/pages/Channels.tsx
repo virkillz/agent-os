@@ -43,7 +43,7 @@ function MessageMenu({ msg, channelId, onDelete, onEditStart }: {
       {open && (
         <div
           className="absolute z-50 right-0 top-6 w-32 rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: 'rgba(8,18,40,0.97)', border: '1px solid rgba(255,255,255,0.12)' }}
+          style={{ background: 'rgb(var(--s1) / 0.97)', border: '1px solid rgba(255,255,255,0.12)' }}
         >
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-white/8 transition-colors"
@@ -355,7 +355,7 @@ export default function Channels() {
       <div
         className="w-48 flex-shrink-0 flex flex-col"
         style={{
-          background: 'rgba(8, 18, 40, 0.72)',
+          background: 'rgb(var(--s1) / 0.72)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           borderRight: '1px solid rgba(255,255,255,0.10)',
@@ -453,7 +453,7 @@ export default function Channels() {
             <div
               className="px-5 py-3.5 flex items-center gap-2"
               style={{
-                background: 'rgba(8, 18, 40, 0.60)',
+                background: 'rgb(var(--s1) / 0.60)',
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
                 borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -506,7 +506,7 @@ export default function Channels() {
                   <div
                     className="absolute right-0 top-full mt-2 w-56 rounded-xl shadow-2xl z-50 overflow-hidden"
                     style={{
-                      background: 'rgba(8,18,40,0.95)',
+                      background: 'rgb(var(--s1) / 0.95)',
                       border: '1px solid rgba(255,255,255,0.12)',
                       backdropFilter: 'blur(20px)',
                       WebkitBackdropFilter: 'blur(20px)',
@@ -703,7 +703,7 @@ export default function Channels() {
                       )}
                       <div
                         className="rounded-2xl rounded-tl-sm px-4 py-2.5"
-                        style={{ background: 'rgba(30,50,90,0.90)', border: '1px solid rgba(255,255,255,0.15)' }}
+                        style={{ background: 'rgb(var(--s2) / 0.90)', border: '1px solid rgba(255,255,255,0.15)' }}
                       >
                         {isEditing ? (
                           <div className="flex flex-col gap-2">
@@ -746,7 +746,7 @@ export default function Channels() {
             <div
               className="px-5 py-4"
               style={{
-                background: 'rgba(8, 18, 40, 0.60)',
+                background: 'rgb(var(--s1) / 0.60)',
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
                 borderTop: '1px solid rgba(255,255,255,0.08)',
@@ -757,7 +757,7 @@ export default function Channels() {
                 <div
                   className="mb-2 rounded-xl overflow-hidden shadow-2xl"
                   style={{
-                    background: 'rgba(8,18,40,0.96)',
+                    background: 'rgb(var(--s1) / 0.96)',
                     border: '1px solid rgba(255,255,255,0.12)',
                     backdropFilter: 'blur(20px)',
                     WebkitBackdropFilter: 'blur(20px)',
@@ -798,7 +798,7 @@ export default function Channels() {
               <div
                 className="flex items-end gap-3 rounded-xl px-3 py-2 transition-colors focus-within:ring-1 focus-within:ring-accent/40"
                 style={{
-                  background: 'rgba(8, 18, 40, 0.70)',
+                  background: 'rgb(var(--s1) / 0.70)',
                   border: '1px solid rgba(255,255,255,0.12)',
                 }}
               >

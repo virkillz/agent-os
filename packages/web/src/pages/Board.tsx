@@ -116,7 +116,7 @@ function AddCardModal({ onConfirm, onClose }: AddCardModalProps) {
     >
       <div
         className="w-full max-w-sm rounded-xl p-5 space-y-4"
-        style={{ background: 'rgba(8,18,40,0.97)', border: '1px solid rgba(255,255,255,0.1)' }}
+        style={{ background: 'rgb(var(--s1) / 0.97)', border: '1px solid rgba(255,255,255,0.1)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>New Card</h2>
         <input
@@ -245,7 +245,7 @@ function CardModal({ card, board, onClose, onUpdated, onDeleted, onMoved, onArch
       <div
         className="h-full w-full max-w-lg flex flex-col overflow-hidden"
         style={{
-          background: 'rgba(8,18,40,0.97)',
+          background: 'rgb(var(--s1) / 0.97)',
           borderLeft: '1px solid rgba(255,255,255,0.1)',
         }}
       >
@@ -424,7 +424,7 @@ function ArchivedModal({ cards, lanes, onUnarchive, onClose }: ArchivedModalProp
     >
       <div
         className="w-full max-w-lg rounded-xl flex flex-col overflow-hidden"
-        style={{ background: 'rgba(8,18,40,0.97)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '80vh' }}
+        style={{ background: 'rgb(var(--s1) / 0.97)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '80vh' }}
       >
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -736,7 +736,7 @@ export default function Board() {
       {/* Header */}
       <div
         className="px-6 py-3 flex items-center gap-2 flex-shrink-0"
-        style={{ background: 'rgba(8,18,40,0.60)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ background: 'rgb(var(--s1) / 0.60)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
       >
         {/* Board selector / title */}
         {boards.length > 1 ? (
@@ -845,7 +845,7 @@ export default function Board() {
                 key={lane.id}
                 className="w-72 flex flex-col rounded-xl animate-zoom-in"
                 style={{
-                  background: 'rgba(8,18,40,0.72)',
+                  background: 'rgb(var(--s1) / 0.72)',
                   backdropFilter: 'blur(14px)',
                   border: '1px solid rgba(255,255,255,0.10)',
                   borderTop: `2px solid ${
@@ -994,7 +994,7 @@ export default function Board() {
               {addingLane ? (
                 <div
                   className="rounded-xl p-3 space-y-2"
-                  style={{ background: 'rgba(8,18,40,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
+                  style={{ background: 'rgb(var(--s1) / 0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
                 >
                   <input
                     autoFocus

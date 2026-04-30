@@ -151,7 +151,7 @@ export function ScheduleSection({ agentId }: { agentId: string }) {
           <div
             className="rounded-xl p-4 mb-6 space-y-3 animate-zoom-in"
             style={{
-              background: 'rgba(8,18,40,0.80)',
+              background: 'rgb(var(--s1) / 0.80)',
               border: '1px solid rgba(255,255,255,0.10)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
@@ -212,7 +212,7 @@ export function ScheduleSection({ agentId }: { agentId: string }) {
             <div
               key={s.id}
               className="rounded-lg px-4 py-3"
-              style={{ background: 'rgba(8,18,40,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
+              style={{ background: 'rgb(var(--s1) / 0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
             >
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">

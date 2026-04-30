@@ -105,7 +105,7 @@ export default function SettingsSkills() {
               <div key={skill.name} className="card flex items-start gap-3 p-4">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
-                  style={{ background: 'rgba(var(--accent), 0.1)', border: '1px solid rgba(var(--accent), 0.2)' }}
+                  style={{ background: 'rgb(var(--accent) / 0.1)', border: '1px solid rgb(var(--accent) / 0.2)' }}
                 >
                   ⚡
                 </div>

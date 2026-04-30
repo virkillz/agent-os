@@ -71,7 +71,7 @@ export function MemorySection({ agentId }: { agentId: string }) {
             <div
               key={entry.id}
               className="rounded-lg px-3 py-2.5 group"
-              style={{ background: 'rgba(8,18,40,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
+              style={{ background: 'rgb(var(--s1) / 0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
             >
               {editingId === entry.id ? (
                 <div className="flex gap-2">

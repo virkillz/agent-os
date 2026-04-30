@@ -197,7 +197,7 @@ function MessageLogModal({
                     </div>
                     <span
                       className="ml-auto text-[10px] flex-shrink-0"
-                      style={{ color: m.direction === 'inbound' ? 'var(--muted)' : 'rgba(var(--accent),0.6)' }}
+                      style={{ color: m.direction === 'inbound' ? 'var(--muted)' : 'rgb(var(--accent) / 0.6)' }}
                     >
                       {m.direction}
                     </span>
@@ -332,8 +332,8 @@ function IntegrationForm({
               key={p}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{
-                background: form.platform === p ? 'rgba(var(--accent), 0.15)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${form.platform === p ? 'rgba(var(--accent), 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                background: form.platform === p ? 'rgb(var(--accent) / 0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${form.platform === p ? 'rgb(var(--accent) / 0.4)' : 'rgba(255,255,255,0.08)'}`,
                 color: form.platform === p ? 'var(--text-primary)' : 'var(--muted)',
               }}
               onClick={() => setForm((f) => ({ ...f, platform: p }))}
@@ -502,7 +502,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
         <div
           className="w-full max-w-4xl rounded-2xl p-6 animate-zoom-in"
           style={{
-            background: 'rgba(8,18,40,0.90)',
+            background: 'rgb(var(--s1) / 0.90)',
             border: '1px solid rgba(255,255,255,0.10)',
             backdropFilter: 'blur(14px)',
           }}

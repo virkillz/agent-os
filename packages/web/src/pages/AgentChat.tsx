@@ -130,7 +130,7 @@ export default function AgentChat() {
           <div
             className="flex items-center justify-between px-6 py-3 flex-shrink-0"
             style={{
-              background: 'rgba(8,18,40,0.95)',
+              background: 'rgb(var(--s1) / 0.95)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -159,26 +159,26 @@ export default function AgentChat() {
         style={{
           maxWidth: '860px',
           height: '100%',
-          background: 'rgba(6, 14, 32, 0.82)',
+          background: 'rgb(var(--s0) / 0.82)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(80, 180, 220, 0.18)',
+          border: '1px solid rgb(var(--accent) / 0.18)',
           borderRadius: '12px',
-          boxShadow: '0 0 0 1px rgba(80, 180, 220, 0.06), 0 8px 48px rgba(0,0,0,0.5), 0 0 60px rgba(40,120,200,0.06)',
+          boxShadow: '0 0 0 1px rgb(var(--accent) / 0.06), 0 8px 48px rgba(0,0,0,0.5), 0 0 60px rgb(var(--accent) / 0.06)',
         }}
       >
         {/* Corner brackets */}
-        <span style={{ position: 'absolute', top: -1, left: -1, width: 16, height: 16, borderTop: '2px solid rgba(80,200,240,0.7)', borderLeft: '2px solid rgba(80,200,240,0.7)', borderRadius: '4px 0 0 0', pointerEvents: 'none' }} />
-        <span style={{ position: 'absolute', top: -1, right: -1, width: 16, height: 16, borderTop: '2px solid rgba(80,200,240,0.7)', borderRight: '2px solid rgba(80,200,240,0.7)', borderRadius: '0 4px 0 0', pointerEvents: 'none' }} />
-        <span style={{ position: 'absolute', bottom: -1, left: -1, width: 16, height: 16, borderBottom: '2px solid rgba(80,200,240,0.7)', borderLeft: '2px solid rgba(80,200,240,0.7)', borderRadius: '0 0 0 4px', pointerEvents: 'none' }} />
-        <span style={{ position: 'absolute', bottom: -1, right: -1, width: 16, height: 16, borderBottom: '2px solid rgba(80,200,240,0.7)', borderRight: '2px solid rgba(80,200,240,0.7)', borderRadius: '0 0 4px 0', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', top: -1, left: -1, width: 16, height: 16, borderTop: '2px solid rgb(var(--accent) / 0.7)', borderLeft: '2px solid rgb(var(--accent) / 0.7)', borderRadius: '4px 0 0 0', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', top: -1, right: -1, width: 16, height: 16, borderTop: '2px solid rgb(var(--accent) / 0.7)', borderRight: '2px solid rgb(var(--accent) / 0.7)', borderRadius: '0 4px 0 0', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', bottom: -1, left: -1, width: 16, height: 16, borderBottom: '2px solid rgb(var(--accent) / 0.7)', borderLeft: '2px solid rgb(var(--accent) / 0.7)', borderRadius: '0 0 0 4px', pointerEvents: 'none' }} />
+        <span style={{ position: 'absolute', bottom: -1, right: -1, width: 16, height: 16, borderBottom: '2px solid rgb(var(--accent) / 0.7)', borderRight: '2px solid rgb(var(--accent) / 0.7)', borderRadius: '0 0 4px 0', pointerEvents: 'none' }} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ borderRadius: '12px' }}>
         {/* Header */}
         <div
           className="flex items-center gap-3 px-6 py-4"
           style={{
-            background: 'rgba(8, 18, 40, 0.72)',
+            background: 'rgb(var(--s1) / 0.72)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -323,7 +323,7 @@ export default function AgentChat() {
               </div>
               <div
                 className="rounded-2xl rounded-tl-sm px-4 py-3"
-                style={{ background: 'rgba(30,50,90,0.90)', border: '1px solid rgba(255,255,255,0.15)' }}
+                style={{ background: 'rgb(var(--s2) / 0.90)', border: '1px solid rgba(255,255,255,0.15)' }}
               >
                 <div className="flex gap-1 items-center h-4">
                   <div
@@ -356,7 +356,7 @@ export default function AgentChat() {
           <div
             className="flex items-end gap-3 rounded-xl px-4 py-3 transition-colors focus-within:ring-1 focus-within:ring-accent/40"
             style={{
-              background: 'rgba(8,18,40,0.75)',
+              background: 'rgb(var(--s1) / 0.75)',
               border: '1px solid rgba(255,255,255,0.12)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
@@ -458,7 +458,7 @@ function MessageBubble({
       {menuOpen && (
         <div
           className="absolute z-50 right-0 top-6 w-32 rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: 'rgba(8,18,40,0.97)', border: '1px solid rgba(255,255,255,0.12)' }}
+          style={{ background: 'rgb(var(--s1) / 0.97)', border: '1px solid rgba(255,255,255,0.12)' }}
         >
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-white/8 transition-colors"
@@ -553,7 +553,7 @@ function MessageBubble({
       </div>
       <div
         className="max-w-[70%] rounded-2xl rounded-tl-sm px-4 py-3"
-        style={{ background: 'rgba(30,50,90,0.90)', border: '1px solid rgba(255,255,255,0.15)' }}
+        style={{ background: 'rgb(var(--s2) / 0.90)', border: '1px solid rgba(255,255,255,0.15)' }}
       >
         {editing ? (
           <div className="flex flex-col gap-2">

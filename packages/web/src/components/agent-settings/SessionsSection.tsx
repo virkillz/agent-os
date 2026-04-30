@@ -179,7 +179,7 @@ export function SessionsSection({ agentId }: { agentId: string }) {
       {/* File list sidebar */}
       <aside
         className="w-56 flex-shrink-0 overflow-y-auto py-2"
-        style={{ borderRight: '1px solid rgba(255,255,255,0.07)', background: 'rgba(8,18,40,0.6)' }}
+        style={{ borderRight: '1px solid rgba(255,255,255,0.07)', background: 'rgb(var(--s1) / 0.6)' }}
       >
         <div className="px-3 mb-2">
           <p className="text-[10px] text-muted uppercase tracking-wider font-semibold">Sessions</p>

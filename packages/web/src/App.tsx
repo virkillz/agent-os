@@ -35,23 +35,8 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
 
-  useEffect(() => {
-    const saved = localStorage.getItem('agentos:background')
-    if (saved) {
-      const preset = ['default', 'midnight', 'aurora', 'nebula', 'void', 'deep-ocean', 'ember']
-      const PRESET_VALUES: Record<string, string> = {
-        default: "url('/background.png')",
-        midnight: 'linear-gradient(135deg, #0a0f1e 0%, #0d1b3e 50%, #07111f 100%)',
-        aurora: 'linear-gradient(135deg, #0d1b2a 0%, #1a2a1a 40%, #0a1a2a 100%)',
-        nebula: 'linear-gradient(135deg, #1a0a2e 0%, #0d1a3e 50%, #1a0a1a 100%)',
-        void: 'linear-gradient(135deg, #050505 0%, #0a0a14 100%)',
-        'deep-ocean': 'linear-gradient(135deg, #020b18 0%, #041830 50%, #051020 100%)',
-        ember: 'linear-gradient(135deg, #1a0a00 0%, #2a1000 50%, #1a0500 100%)',
-      }
-      const value = preset.includes(saved) ? PRESET_VALUES[saved] : saved
-      document.body.style.backgroundImage = value
-    }
-  }, [])
+  // ThemeProvider handles all background and color theming
+  // No manual background setup needed here
 
   useEffect(() => {
     loadSettings()

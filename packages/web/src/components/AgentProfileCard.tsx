@@ -26,15 +26,15 @@ export function AgentProfileCard({ agentId }: AgentProfileCardProps) {
     <div
       className="rounded-xl p-6 mb-6 relative overflow-hidden"
       style={{
-        background: 'rgba(10, 22, 45, 0.85)',
+        background: 'rgb(var(--s1) / 0.85)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(100, 210, 230, 0.15)',
+        border: '1px solid rgb(var(--accent) / 0.15)',
       }}
     >
       <div
         className="absolute top-0 left-0 right-0 h-[1px]"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(100, 210, 230, 0.3), transparent)' }}
+        style={{ background: 'linear-gradient(90deg, transparent, rgb(var(--accent) / 0.3), transparent)' }}
       />
 
       <div className="flex items-center gap-6">
@@ -45,16 +45,16 @@ export function AgentProfileCard({ agentId }: AgentProfileCardProps) {
               alt={agent.name}
               className="w-20 h-20 rounded-xl object-cover"
               style={{
-                border: '2px solid rgba(100, 210, 230, 0.2)',
+                border: '2px solid rgb(var(--accent) / 0.2)',
               }}
             />
           ) : (
             <div
               className="w-20 h-20 rounded-xl flex items-center justify-center text-3xl font-bold"
               style={{
-                backgroundColor: 'rgba(100, 210, 230, 0.1)',
-                border: '2px solid rgba(100, 210, 230, 0.2)',
-                color: 'rgba(140, 220, 235, 0.8)',
+                backgroundColor: 'rgb(var(--accent) / 0.1)',
+                border: '2px solid rgb(var(--accent) / 0.2)',
+                color: 'rgb(var(--accent) / 0.8)',
               }}
             >
               {agent.name[0].toUpperCase()}
@@ -64,7 +64,7 @@ export function AgentProfileCard({ agentId }: AgentProfileCardProps) {
             className={`absolute bottom-1 right-1 w-4 h-4 rounded-full ${agentStatus[agent.id] === 'thinking' ? 'animate-pulse' : ''}`}
             style={{
               background: dotColor,
-              border: '2px solid rgba(10, 22, 45, 0.9)',
+              border: '2px solid rgb(var(--s1) / 0.9)',
             }}
           />
         </div>
@@ -78,7 +78,7 @@ export function AgentProfileCard({ agentId }: AgentProfileCardProps) {
           </h2>
           <p
             className="text-xs tracking-wider uppercase mb-2"
-            style={{ color: 'rgba(130, 160, 185, 0.6)' }}
+            style={{ color: 'rgb(var(--muted) / 0.6)' }}
           >
             {agent.role}
           </p>
@@ -97,7 +97,7 @@ export function AgentProfileCard({ agentId }: AgentProfileCardProps) {
           <div className="hidden md:block flex-1 min-w-0">
             <p
               className="text-sm line-clamp-2"
-              style={{ color: 'rgba(160, 180, 200, 0.7)' }}
+              style={{ color: 'rgb(var(--muted) / 0.7)' }}
             >
               {agent.description}
             </p>

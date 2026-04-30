@@ -29,7 +29,7 @@ function TodoRow({
   return (
     <div
       className="flex items-center gap-2.5 rounded-lg px-3 py-2 group"
-      style={{ background: 'rgba(8,18,40,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
+      style={{ background: 'rgb(var(--s1) / 0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
     >
       <button
         className="flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors"

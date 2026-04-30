@@ -47,10 +47,10 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
           className="flex-1 flex items-center justify-between px-5"
           style={{
             height: '52px',
-            background: 'linear-gradient(135deg, rgba(15, 30, 55, 0.82) 0%, rgba(10, 28, 52, 0.88) 100%)',
+            background: 'linear-gradient(135deg, rgb(var(--s1) / 0.82) 0%, rgb(var(--s0) / 0.88) 100%)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(120, 200, 230, 0.12)',
+            border: '1px solid rgb(var(--accent) / 0.12)',
             borderRadius: '999px',
             boxShadow: '0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}
@@ -61,7 +61,7 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
               <button
                 onClick={() => navigate(-1)}
                 className="flex items-center gap-1 text-xs font-medium mr-2 transition-opacity hover:opacity-100"
-                style={{ color: 'rgba(140, 185, 210, 0.7)' }}
+                style={{ color: 'var(--muted)' }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -75,13 +75,13 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
             >
               <div
                 className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0"
-                style={{ border: '1px solid rgba(100, 200, 225, 0.18)' }}
+                style={{ border: '1px solid rgb(var(--accent) / 0.18)' }}
               >
                 <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
               </div>
               <span
                 className="text-sm font-bold tracking-wide"
-                style={{ color: 'rgba(220, 238, 248, 0.95)', fontFamily: "'Bitcount Prop Single Circle', monospace" }}
+                style={{ color: 'var(--text-primary)', fontFamily: "'Bitcount Prop Single Circle', monospace" }}
               >
                 Agent OS
               </span>
@@ -96,17 +96,17 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold uppercase flex-shrink-0 overflow-hidden"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(60, 140, 180, 0.5), rgba(30, 80, 130, 0.6))',
-                    border: '1.5px solid rgba(100, 200, 230, 0.3)',
-                    color: 'rgba(170, 225, 245, 0.95)',
-                    boxShadow: '0 0 10px rgba(80, 180, 220, 0.2)',
+                    background: 'linear-gradient(135deg, rgb(var(--accent) / 0.5), rgb(var(--accent) / 0.3))',
+                    border: '1.5px solid rgb(var(--accent) / 0.3)',
+                    color: 'var(--text-primary)',
+                    boxShadow: '0 0 10px rgb(var(--accent) / 0.2)',
                   }}
                 >
                   {currentUser.display_name?.[0] || currentUser.username?.[0] || 'A'}
                 </div>
                 <span
                   className="text-xs font-semibold"
-                  style={{ color: 'rgba(190, 220, 240, 0.85)' }}
+                  style={{ color: 'var(--subtle)' }}
                 >
                   {currentUser.display_name || currentUser.username || 'Admin'}
                 </span>
@@ -117,7 +117,7 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
             <button
               onClick={() => navigate('/channels')}
               className="relative flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80 active:scale-95"
-              style={{ color: 'rgba(140, 190, 215, 0.6)', padding: '4px' }}
+              style={{ color: 'var(--muted)', padding: '4px' }}
               title="Direct Messages"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -143,7 +143,7 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
             <button
               onClick={() => navigate('/settings')}
               className="flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80 active:scale-95"
-              style={{ color: 'rgba(140, 190, 215, 0.6)', padding: '4px' }}
+              style={{ color: 'var(--muted)', padding: '4px' }}
               title="Settings"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
