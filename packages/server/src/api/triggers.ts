@@ -54,6 +54,8 @@ export function createTriggersRouter(): Router {
       return res.status(400).json({ error: 'Cannot delete the internal chat trigger' })
     }
 
+    // Clear FK references in invocation_queue so the DELETE succeeds
+    db.prepare('UPDATE invocation_queue SET trigger_id = NULL WHERE trigger_id = ?').run(row.id)
     db.prepare('DELETE FROM agent_triggers WHERE id = ?').run(row.id)
     res.json({ ok: true })
   })
@@ -70,7 +72,7 @@ export function createTriggersRouter(): Router {
     if (!trigger) return res.status(404).json({ error: 'Trigger not found' })
 
     const workspaceDir = resolveWorkspaceDir()
-    const systemPrompt = buildSystemPrompt(agent, workspaceDir)
+    const systemPrompt = buildSystemPrompt(agent, workspaceDir, true)
 
     // Build trigger context addendum based on trigger type
     let triggerContextAddendum = ''
@@ -85,7 +87,7 @@ export function createTriggersRouter(): Router {
       triggerContextAddendum = [
         '[Trigger Context — Scheduler]',
         'You are running a scheduled task. No reply is needed — complete the task and use',
-        'available tools (send_direct_message, channel_post) if you need to communicate results.',
+        'available tools (send_direct_message) if you need to communicate results.',
       ].join('\n')
 
       return res.json({

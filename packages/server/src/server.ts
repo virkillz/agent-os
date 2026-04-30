@@ -20,7 +20,7 @@ import { createSkillsRouter } from './api/skills.js'
 import { createPlatformToolsRouter } from './api/platform-tools.js'
 import { createNotificationsRouter } from './api/notifications.js'
 import { createTriggersRouter } from './api/triggers.js'
-import { createIntegrationsRouter } from './api/integrations.js'
+import { createChannelsRouter } from './api/channels.js'
 import { createConnectionProfilesRouter } from './api/connection-profiles.js'
 import { createMcpRouter } from './api/mcp.js'
 import { createNotification } from './notification-service.js'
@@ -62,7 +62,7 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
   // app.use('/api/boards', createBoardsRouter())
   app.use('/api/notifications', createNotificationsRouter())
   app.use('/api/agents', createTriggersRouter())
-  app.use('/api/agents', createIntegrationsRouter())
+  app.use('/api/agents', createChannelsRouter())
   app.use('/api/connection-profiles', createConnectionProfilesRouter())
   app.use('/api/mcp', createMcpRouter())
 

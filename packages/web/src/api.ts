@@ -98,9 +98,9 @@ export const api = {
   // ─── Sessions ─────────────────────────────────────────────────────────────
 
   sessions: {
-    list: (agentId: string) => req<SessionFile[]>('GET', `/agents/${agentId}/sessions`),
-    read: (agentId: string, filename: string) =>
-      req<SessionEvent[]>('GET', `/agents/${agentId}/sessions/${encodeURIComponent(filename)}`),
+    list: (agentId: string) => req<SessionNode[]>('GET', `/agents/${agentId}/sessions`),
+    read: (agentId: string, filepath: string) =>
+      req<SessionEvent[]>('GET', `/agents/${agentId}/sessions/${encodeURIComponent(filepath)}`),
   },
 
   // ─── Memory ───────────────────────────────────────────────────────────────
@@ -284,21 +284,21 @@ export const api = {
     delete: (id: string) => req<{ ok: boolean }>('DELETE', `/connection-profiles/${id}`),
   },
 
-  // ─── Integrations ─────────────────────────────────────────────────────────
+  // ─── Agent Channels ───────────────────────────────────────────────────────
 
-  integrations: {
+  agentChannels: {
     list: (agentId: string) =>
-      req<Integration[]>('GET', `/agents/${agentId}/integrations`),
-    get: (agentId: string, iid: string) =>
-      req<Integration>('GET', `/agents/${agentId}/integrations/${iid}`),
+      req<AgentChannel[]>('GET', `/agents/${agentId}/channels`),
+    get: (agentId: string, cid: string) =>
+      req<AgentChannel>('GET', `/agents/${agentId}/channels/${cid}`),
     create: (agentId: string, data: { platform: 'slack' | 'telegram'; config: Record<string, unknown> }) =>
-      req<Integration>('POST', `/agents/${agentId}/integrations`, data),
-    patch: (agentId: string, iid: string, data: { config?: Record<string, unknown>; enabled?: number }) =>
-      req<Integration>('PATCH', `/agents/${agentId}/integrations/${iid}`, data),
-    delete: (agentId: string, iid: string) =>
-      req<{ ok: boolean }>('DELETE', `/agents/${agentId}/integrations/${iid}`),
-    restart: (agentId: string, iid: string) =>
-      req<{ ok: boolean }>('POST', `/agents/${agentId}/integrations/${iid}/restart`),
+      req<AgentChannel>('POST', `/agents/${agentId}/channels`, data),
+    patch: (agentId: string, cid: string, data: { config?: Record<string, unknown>; enabled?: number }) =>
+      req<AgentChannel>('PATCH', `/agents/${agentId}/channels/${cid}`, data),
+    delete: (agentId: string, cid: string) =>
+      req<{ ok: boolean }>('DELETE', `/agents/${agentId}/channels/${cid}`),
+    restart: (agentId: string, cid: string) =>
+      req<{ ok: boolean }>('POST', `/agents/${agentId}/channels/${cid}/restart`),
     platformMessages: (agentId: string, opts?: { platform?: string; scope_id?: string; thread_id?: string; limit?: number }) => {
       const params = new URLSearchParams()
       if (opts?.platform) params.set('platform', opts.platform)
@@ -413,10 +413,14 @@ export interface ChatMessage {
   created_at: string
 }
 
-export interface SessionFile {
-  filename: string
-  size: number
-  mtime: string
+export interface SessionNode {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  size?: number
+  mtime?: string
+  label?: string
+  children?: SessionNode[]
 }
 
 export interface SessionEvent {
@@ -615,7 +619,7 @@ export interface TriggerPreview {
   total_history_available?: number
 }
 
-export interface Integration {
+export interface AgentChannel {
   id: string
   agent_id: string
   platform: 'slack' | 'telegram'

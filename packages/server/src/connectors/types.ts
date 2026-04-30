@@ -39,8 +39,8 @@ export interface TriggerContext {
   senderId: string
 }
 
-/** Config shape returned from agent_integrations.config for Slack */
-export interface SlackIntegrationConfig {
+/** Config shape returned from agent_channels.config for Slack */
+export interface SlackChannelConfig {
   app_token: string
   bot_token: string
   dm_enabled?: boolean
@@ -50,8 +50,8 @@ export interface SlackIntegrationConfig {
   include_reactions_in_history?: boolean
 }
 
-/** Config shape returned from agent_integrations.config for Telegram */
-export interface TelegramIntegrationConfig {
+/** Config shape returned from agent_channels.config for Telegram */
+export interface TelegramChannelConfig {
   bot_token: string
   dm_enabled?: boolean
   group_ids?: string[]

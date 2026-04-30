@@ -32,7 +32,20 @@ function addColumnIfNotExists(db: DB, table: string, column: string, definition:
   }
 }
 
+function renameTableIfExists(db: DB, oldName: string, newName: string): void {
+  const oldRow = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`).get(oldName) as { name: string } | undefined
+  if (!oldRow) return
+
+  const newRow = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`).get(newName) as { name: string } | undefined
+  if (newRow) return // Target already exists, nothing to do
+
+  db.exec(`ALTER TABLE ${oldName} RENAME TO ${newName}`)
+}
+
 function runMigrations(db: DB): void {
+  // Rename legacy agent_integrations → agent_channels
+  renameTableIfExists(db, 'agent_integrations', 'agent_channels')
+
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -238,9 +251,9 @@ function runMigrations(db: DB): void {
     CREATE INDEX IF NOT EXISTS idx_invocation_queue_trigger
       ON invocation_queue(trigger_id, created_at);
 
-    -- ── Agent Integrations ────────────────────────────────────────────────────
+    -- ── Agent Channels ────────────────────────────────────────────────────────
 
-    CREATE TABLE IF NOT EXISTS agent_integrations (
+    CREATE TABLE IF NOT EXISTS agent_channels (
       id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
       agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
       platform    TEXT NOT NULL,   -- 'slack' | 'telegram'
@@ -250,7 +263,7 @@ function runMigrations(db: DB): void {
       updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(agent_id, platform)
     );
-    CREATE INDEX IF NOT EXISTS idx_agent_integrations_agent ON agent_integrations(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_channels_agent ON agent_channels(agent_id);
 
     -- ── MCP Servers ────────────────────────────────────────────────────────────
 
@@ -516,7 +529,7 @@ export interface InvocationQueueRow {
   processed_at: string | null
 }
 
-export interface AgentIntegrationRow {
+export interface AgentChannelRow {
   id: string
   agent_id: string
   platform: 'slack' | 'telegram'
@@ -633,6 +646,12 @@ export function endChannelSession(sessionId: string): void {
   getDb()
     .prepare("UPDATE channel_sessions SET ended_at = datetime('now') WHERE id = ?")
     .run(sessionId)
+}
+
+export function getAgentChannelSessions(agentId: string): ChannelSessionRow[] {
+  return getDb()
+    .prepare('SELECT * FROM channel_sessions WHERE agent_id = ? ORDER BY started_at ASC')
+    .all(agentId) as unknown as ChannelSessionRow[]
 }
 
 

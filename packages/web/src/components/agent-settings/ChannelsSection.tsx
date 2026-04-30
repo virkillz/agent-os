@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, type Integration, type PlatformMessage } from '../../api.ts'
+import { api, type AgentChannel, type PlatformMessage } from '../../api.ts'
 import { useAppEvents } from '../../hooks/useAppEvents.ts'
 import { XIcon } from './icons.tsx'
 
@@ -73,11 +73,11 @@ function conversationLabel(c: Conversation): string {
 
 function MessageLogModal({
   agentId,
-  integration,
+  channel,
   onClose,
 }: {
   agentId: string
-  integration: Integration
+  channel: AgentChannel
   onClose: () => void
 }) {
   const [messages, setMessages] = useState<PlatformMessage[]>([])
@@ -85,8 +85,8 @@ function MessageLogModal({
   const [selectedConvo, setSelectedConvo] = useState<string | null>(null)
 
   useEffect(() => {
-    api.integrations
-      .platformMessages(agentId, { platform: integration.platform, limit: 200 })
+    api.agentChannels
+      .platformMessages(agentId, { platform: channel.platform, limit: 200 })
       .then((msgs) => {
         setMessages(msgs)
         const groups = groupMessages(msgs)
@@ -96,7 +96,7 @@ function MessageLogModal({
         }
       })
       .finally(() => setLoading(false))
-  }, [agentId, integration.platform])
+  }, [agentId, channel.platform])
 
   const conversations = groupMessages(messages)
   const activeConvo = conversations.find(
@@ -126,9 +126,9 @@ function MessageLogModal({
         >
           <div>
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {PLATFORM_ICONS[integration.platform]} {PLATFORM_LABELS[integration.platform]} Message Log
+              {PLATFORM_ICONS[channel.platform]} {PLATFORM_LABELS[channel.platform]} Message Log
             </h3>
-            <p className="text-[11px] text-muted mt-0.5">All messages received and sent via this integration</p>
+            <p className="text-[11px] text-muted mt-0.5">All messages received and sent via this channel</p>
           </div>
           <button
             className="p-1.5 rounded hover:bg-white/[0.07] text-muted transition-colors"
@@ -248,15 +248,15 @@ const DEFAULT_FORM: FormState = {
   tg_dm_enabled: true,
 }
 
-function integrationToForm(i: Integration): FormState {
-  const c = i.config
-  if (i.platform === 'slack') {
+function channelToForm(c: AgentChannel): FormState {
+  const cfg = c.config
+  if (c.platform === 'slack') {
     return {
       platform: 'slack',
-      app_token: (c.app_token as string) ?? '',
-      bot_token: (c.bot_token as string) ?? '',
-      channel_ids: Array.isArray(c.channel_ids) ? (c.channel_ids as string[]).join(', ') : '',
-      dm_enabled: (c.dm_enabled as boolean) ?? true,
+      app_token: (cfg.app_token as string) ?? '',
+      bot_token: (cfg.bot_token as string) ?? '',
+      channel_ids: Array.isArray(cfg.channel_ids) ? (cfg.channel_ids as string[]).join(', ') : '',
+      dm_enabled: (cfg.dm_enabled as boolean) ?? true,
       tg_bot_token: '',
       group_ids: '',
       tg_dm_enabled: true,
@@ -268,9 +268,9 @@ function integrationToForm(i: Integration): FormState {
     bot_token: '',
     channel_ids: '',
     dm_enabled: true,
-    tg_bot_token: (c.bot_token as string) ?? '',
-    group_ids: Array.isArray(c.group_ids) ? (c.group_ids as string[]).join(', ') : '',
-    tg_dm_enabled: (c.dm_enabled as boolean) ?? true,
+    tg_bot_token: (cfg.bot_token as string) ?? '',
+    group_ids: Array.isArray(cfg.group_ids) ? (cfg.group_ids as string[]).join(', ') : '',
+    tg_dm_enabled: (cfg.dm_enabled as boolean) ?? true,
   }
 }
 
@@ -292,7 +292,7 @@ function buildConfig(f: FormState): Record<string, unknown> {
 
 // ─── Inline form ──────────────────────────────────────────────────────────────
 
-function IntegrationForm({
+function ChannelForm({
   form,
   setForm,
   availablePlatforms,
@@ -318,14 +318,14 @@ function IntegrationForm({
     >
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {isEdit ? 'Edit Integration' : 'New Integration'}
+          {isEdit ? 'Edit Channel' : 'New Channel'}
         </h4>
         <button className="p-1 rounded hover:bg-white/[0.07] text-muted" onClick={onCancel}>
           <XIcon />
         </button>
       </div>
 
-      {/* Platform selector — only shown for new integrations */}
+      {/* Platform selector — only shown for new channels */}
       {!isEdit && (
         <div className="flex gap-2 mb-4">
           {availablePlatforms.map((p) => (
@@ -405,7 +405,7 @@ function IntegrationForm({
 
       <div className="flex justify-end mt-4">
         <button className="btn-primary text-xs px-4 py-1.5" onClick={onSubmit} disabled={saving}>
-          {saving ? 'Saving…' : isEdit ? 'Update' : 'Save integration'}
+          {saving ? 'Saving…' : isEdit ? 'Update' : 'Save channel'}
         </button>
       </div>
     </div>
@@ -414,8 +414,8 @@ function IntegrationForm({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function IntegrationsSection({ agentId }: { agentId: string }) {
-  const [integrations, setIntegrations] = useState<Integration[]>([])
+export function ChannelsSection({ agentId }: { agentId: string }) {
+  const [channels, setChannels] = useState<AgentChannel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -436,16 +436,16 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
   const [deleteError, setDeleteError] = useState('')
 
   // Message log modal
-  const [msgLogIntegration, setMsgLogIntegration] = useState<Integration | null>(null)
+  const [msgLogChannel, setMsgLogChannel] = useState<AgentChannel | null>(null)
 
   const agentIdRef = useRef(agentId)
   agentIdRef.current = agentId
 
   useEffect(() => {
     setLoading(true)
-    api.integrations
+    api.agentChannels
       .list(agentId)
-      .then(setIntegrations)
+      .then(setChannels)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
   }, [agentId])
@@ -456,7 +456,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
       (event.type === 'connector:started' || event.type === 'connector:stopped' || event.type === 'connector:error') &&
       event.agentId === agentIdRef.current
     ) {
-      api.integrations.list(agentIdRef.current).then(setIntegrations).catch(() => {})
+      api.agentChannels.list(agentIdRef.current).then(setChannels).catch(() => {})
     }
   })
 
@@ -464,11 +464,11 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
     setAddSaving(true)
     setAddError('')
     try {
-      const created = await api.integrations.create(agentId, {
+      const created = await api.agentChannels.create(agentId, {
         platform: addForm.platform,
         config: buildConfig(addForm),
       })
-      setIntegrations((prev) => [...prev, created])
+      setChannels((prev) => [...prev, created])
       setShowAddForm(false)
       setAddForm(DEFAULT_FORM)
     } catch (e: unknown) {
@@ -478,9 +478,9 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
     }
   }
 
-  function openEdit(i: Integration) {
-    setEditingId(i.id)
-    setEditForm(integrationToForm(i))
+  function openEdit(c: AgentChannel) {
+    setEditingId(c.id)
+    setEditForm(channelToForm(c))
     setEditError('')
   }
 
@@ -489,8 +489,8 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
     setEditSaving(true)
     setEditError('')
     try {
-      const updated = await api.integrations.patch(agentId, editingId, { config: buildConfig(editForm) })
-      setIntegrations((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+      const updated = await api.agentChannels.patch(agentId, editingId, { config: buildConfig(editForm) })
+      setChannels((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
       setEditingId(null)
     } catch (e: unknown) {
       setEditError(e instanceof Error ? e.message : 'Failed to update')
@@ -499,17 +499,17 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
     }
   }
 
-  async function handleToggle(i: Integration) {
-    const updated = await api.integrations.patch(agentId, i.id, { enabled: i.enabled ? 0 : 1 })
-    setIntegrations((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+  async function handleToggle(c: AgentChannel) {
+    const updated = await api.agentChannels.patch(agentId, c.id, { enabled: c.enabled ? 0 : 1 })
+    setChannels((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
   }
 
   const [restarting, setRestarting] = useState<string | null>(null)
 
-  async function handleRestart(i: Integration) {
-    setRestarting(i.id)
+  async function handleRestart(c: AgentChannel) {
+    setRestarting(c.id)
     try {
-      await api.integrations.restart(agentId, i.id)
+      await api.agentChannels.restart(agentId, c.id)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to restart connector')
     } finally {
@@ -517,23 +517,23 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
     }
   }
 
-  function requestDelete(i: Integration) {
-    setDeleteConfirmId(i.id)
+  function requestDelete(c: AgentChannel) {
+    setDeleteConfirmId(c.id)
     setDeleteError('')
   }
 
-  async function confirmDelete(i: Integration) {
+  async function confirmDelete(c: AgentChannel) {
     try {
-      await api.integrations.delete(agentId, i.id)
-      setIntegrations((prev) => prev.filter((x) => x.id !== i.id))
+      await api.agentChannels.delete(agentId, c.id)
+      setChannels((prev) => prev.filter((x) => x.id !== c.id))
       setDeleteConfirmId(null)
     } catch (e: unknown) {
-      setDeleteError(e instanceof Error ? e.message : 'Failed to delete integration')
+      setDeleteError(e instanceof Error ? e.message : 'Failed to delete channel')
     }
   }
 
   const availablePlatforms = (['slack', 'telegram'] as const).filter(
-    (p) => !integrations.find((i) => i.platform === p)
+    (p) => !channels.find((c) => c.platform === p)
   )
 
   return (
@@ -549,7 +549,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
         >
           <div className="flex items-center justify-between mb-4">
             <p className="text-xs text-muted">
-              Connect this agent to external platforms. Each integration starts a live connector.
+              Connect this agent to external platforms. Each channel starts a live connector.
             </p>
             {availablePlatforms.length > 0 && !showAddForm && (
               <button
@@ -559,7 +559,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
                   setAddForm({ ...DEFAULT_FORM, platform: availablePlatforms[0] })
                 }}
               >
-                + Add integration
+                + Add channel
               </button>
             )}
           </div>
@@ -569,7 +569,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
 
           {/* Add form */}
           {showAddForm && (
-            <IntegrationForm
+            <ChannelForm
               form={addForm}
               setForm={setAddForm}
               availablePlatforms={availablePlatforms}
@@ -581,54 +581,54 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
             />
           )}
 
-          {/* Integration list */}
+          {/* Channel list */}
           {loading ? (
             <p className="text-sm text-muted text-center py-8">Loading…</p>
-          ) : integrations.length === 0 && !showAddForm ? (
-            <p className="text-sm text-muted text-center py-8">No integrations configured yet.</p>
+          ) : channels.length === 0 && !showAddForm ? (
+            <p className="text-sm text-muted text-center py-8">No channels configured yet.</p>
           ) : (
             <div className="space-y-3">
-              {integrations.map((i) => (
-                <div key={i.id}>
-                  {/* Integration row */}
-                  {editingId !== i.id && (
+              {channels.map((c) => (
+                <div key={c.id}>
+                  {/* Channel row */}
+                  {editingId !== c.id && (
                     <div
                       className="rounded-xl overflow-hidden"
-                      style={{ border: '1px solid rgba(255,255,255,0.07)', opacity: i.enabled ? 1 : 0.55 }}
+                      style={{ border: '1px solid rgba(255,255,255,0.07)', opacity: c.enabled ? 1 : 0.55 }}
                     >
                       <div
                         className="flex items-center gap-3 px-4 py-3"
                         style={{ background: 'rgba(255,255,255,0.04)' }}
                       >
-                        <span className="text-lg flex-shrink-0">{PLATFORM_ICONS[i.platform]}</span>
+                        <span className="text-lg flex-shrink-0">{PLATFORM_ICONS[c.platform]}</span>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                              {PLATFORM_LABELS[i.platform]}
+                              {PLATFORM_LABELS[c.platform]}
                             </span>
-                            <StatusBadge status={i.status} error={i.error} />
+                            <StatusBadge status={c.status} error={c.error} />
                           </div>
                           <div className="text-[11px] text-muted mt-0.5">
-                            {i.enabled ? 'Enabled' : 'Disabled'} · added {new Date(i.created_at).toLocaleDateString()}
-                            {i.status === 'error' && i.error && (
+                            {c.enabled ? 'Enabled' : 'Disabled'} · added {new Date(c.created_at).toLocaleDateString()}
+                            {c.status === 'error' && c.error && (
                               <span className="ml-2" style={{ color: 'var(--status-red, #f87171)' }}>
-                                — {i.error}
+                                — {c.error}
                               </span>
                             )}
                           </div>
                           {/* Config summary */}
-                          <ConfigSummary platform={i.platform} config={i.config} />
+                          <ConfigSummary platform={c.platform} config={c.config} />
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {deleteConfirmId === i.id ? (
+                          {deleteConfirmId === c.id ? (
                             <>
                               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Remove?</span>
                               <button
                                 className="text-xs px-2.5 py-1 rounded-md transition-colors"
                                 style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
-                                onClick={() => confirmDelete(i)}
+                                onClick={() => confirmDelete(c)}
                               >
                                 Yes, remove
                               </button>
@@ -642,21 +642,21 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
                             </>
                           ) : (
                             <>
-                              {i.enabled && i.status !== 'running' && (
+                              {c.enabled && c.status !== 'running' && (
                                 <button
                                   className="text-xs px-2.5 py-1 rounded-md transition-colors"
                                   style={{ background: 'rgba(var(--accent) / 0.12)', color: 'rgb(var(--accent))', border: '1px solid rgb(var(--accent) / 0.3)' }}
-                                  onClick={() => handleRestart(i)}
-                                  disabled={restarting === i.id}
+                                  onClick={() => handleRestart(c)}
+                                  disabled={restarting === c.id}
                                   title="Restart connector"
                                 >
-                                  {restarting === i.id ? 'Restarting…' : 'Restart'}
+                                  {restarting === c.id ? 'Restarting…' : 'Restart'}
                                 </button>
                               )}
                               <button
                                 className="text-xs px-2.5 py-1 rounded-md transition-colors"
                                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
-                                onClick={() => setMsgLogIntegration(i)}
+                                onClick={() => setMsgLogChannel(c)}
                                 title="View message log"
                               >
                                 Messages
@@ -664,7 +664,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
                               <button
                                 className="text-xs px-2.5 py-1 rounded-md transition-colors"
                                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
-                                onClick={() => openEdit(i)}
+                                onClick={() => openEdit(c)}
                                 title="Edit configuration"
                               >
                                 Edit
@@ -672,14 +672,14 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
                               <button
                                 className="text-xs px-2.5 py-1 rounded-md transition-colors"
                                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
-                                onClick={() => handleToggle(i)}
+                                onClick={() => handleToggle(c)}
                               >
-                                {i.enabled ? 'Disable' : 'Enable'}
+                                {c.enabled ? 'Disable' : 'Enable'}
                               </button>
                               <button
                                 className="p-1.5 rounded hover:bg-red-500/10 text-muted hover:text-red-400 transition-colors"
-                                title="Remove integration"
-                                onClick={() => requestDelete(i)}
+                                title="Remove channel"
+                                onClick={() => requestDelete(c)}
                               >
                                 <XIcon />
                               </button>
@@ -691,11 +691,11 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
                   )}
 
                   {/* Edit form (inline, replaces row) */}
-                  {editingId === i.id && (
-                    <IntegrationForm
+                  {editingId === c.id && (
+                    <ChannelForm
                       form={editForm}
                       setForm={setEditForm}
-                      availablePlatforms={[i.platform]}
+                      availablePlatforms={[c.platform]}
                       isEdit
                       saving={editSaving}
                       saveError={editError}
@@ -711,11 +711,11 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
       </div>
 
       {/* Message log modal */}
-      {msgLogIntegration && (
+      {msgLogChannel && (
         <MessageLogModal
           agentId={agentId}
-          integration={msgLogIntegration}
-          onClose={() => setMsgLogIntegration(null)}
+          channel={msgLogChannel}
+          onClose={() => setMsgLogChannel(null)}
         />
       )}
     </>

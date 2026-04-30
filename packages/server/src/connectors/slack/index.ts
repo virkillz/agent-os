@@ -6,7 +6,7 @@ import chalk from 'chalk'
 import { getDb } from '../../db.js'
 import { enqueueInvocation } from '../../queue-worker.js'
 import { endAndClearChannelSession } from '../../agent-runner.js'
-import type { Connector, SlackIntegrationConfig } from '../types.js'
+import type { Connector, SlackChannelConfig } from '../types.js'
 import { toSlackMarkdown } from './format.js'
 import type { SlackTriggerMeta } from './context.js'
 
@@ -14,11 +14,11 @@ export class SlackConnector implements Connector {
   readonly platform = 'slack' as const
   readonly agentId: string
 
-  private config: SlackIntegrationConfig
   private app: InstanceType<typeof App>
-  private botUserId: string | null = null
+  private botUserId?: string
+  private config: SlackChannelConfig
 
-  constructor(agentId: string, config: SlackIntegrationConfig) {
+  constructor(agentId: string, config: SlackChannelConfig) {
     this.agentId = agentId
     this.config = config
     this.app = new App({

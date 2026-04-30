@@ -1,14 +1,14 @@
 import chalk from 'chalk'
-import { getDb, type AgentIntegrationRow } from '../db.js'
+import { getDb, type AgentChannelRow } from '../db.js'
 import { eventBus } from '../event-bus.js'
-import type { Connector, SlackIntegrationConfig, TelegramIntegrationConfig } from './types.js'
+import type { Connector, SlackChannelConfig, TelegramChannelConfig } from './types.js'
 import { SlackConnector } from './slack/index.js'
 import { TelegramConnector } from './telegram/index.js'
 
 /**
  * ConnectorLoader manages the lifecycle of all platform connectors.
- * It reads agent_integrations on startup, instantiates the right Connector
- * implementation for each row, and hot-reloads when integration config changes.
+ * It reads agent_channels on startup, instantiates the right Connector
+ * implementation for each row, and hot-reloads when channel config changes.
  *
  * Phase 2 skeleton: connector instantiation is a no-op until Phase 3/4
  * add the actual Slack/Telegram connector implementations.
@@ -25,8 +25,8 @@ class ConnectorLoader {
 
   async start(): Promise<void> {
     const rows = getDb()
-      .prepare('SELECT * FROM agent_integrations WHERE enabled = 1')
-      .all() as unknown as AgentIntegrationRow[]
+      .prepare('SELECT * FROM agent_channels WHERE enabled = 1')
+      .all() as unknown as AgentChannelRow[]
 
     for (const row of rows) {
       await this.startConnector(row)
@@ -34,7 +34,7 @@ class ConnectorLoader {
 
     // Hot-reload: when an integration is created/updated/deleted, restart its connector
     eventBus.on((event) => {
-      if (event.type === 'integration:config_updated') {
+      if (event.type === 'channel:config_updated') {
         void this.reloadConnector(event.agentId, event.platform)
       }
     })
@@ -47,7 +47,7 @@ class ConnectorLoader {
     this.active.clear()
   }
 
-  private async startConnector(row: AgentIntegrationRow): Promise<void> {
+  private async startConnector(row: AgentChannelRow): Promise<void> {
     const connector = this.buildConnector(row)
     if (!connector) return  // platform not yet implemented
 
@@ -85,8 +85,8 @@ class ConnectorLoader {
     await this.stopConnector(agentId, platform)
 
     const row = getDb()
-      .prepare('SELECT * FROM agent_integrations WHERE agent_id = ? AND platform = ? AND enabled = 1')
-      .get(agentId, platform) as unknown as AgentIntegrationRow | undefined
+      .prepare('SELECT * FROM agent_channels WHERE agent_id = ? AND platform = ? AND enabled = 1')
+      .get(agentId, platform) as unknown as AgentChannelRow | undefined
 
     if (row) {
       await this.startConnector(row)
@@ -117,11 +117,11 @@ class ConnectorLoader {
    * Instantiate the right Connector class for a given integration row.
    * Returns null for platforms not yet implemented (Phase 4+).
    */
-  private buildConnector(row: AgentIntegrationRow): Connector | null {
+  private buildConnector(row: AgentChannelRow): Connector | null {
     if (row.platform === 'slack') {
-      let config: SlackIntegrationConfig
+      let config: SlackChannelConfig
       try {
-        config = JSON.parse(row.config) as SlackIntegrationConfig
+        config = JSON.parse(row.config) as SlackChannelConfig
       } catch {
         console.error(chalk.red('[connector]'), `invalid Slack config JSON for agent ${row.agent_id}`)
         return null
@@ -134,9 +134,9 @@ class ConnectorLoader {
     }
 
     if (row.platform === 'telegram') {
-      let config: TelegramIntegrationConfig
+      let config: TelegramChannelConfig
       try {
-        config = JSON.parse(row.config) as TelegramIntegrationConfig
+        config = JSON.parse(row.config) as TelegramChannelConfig
       } catch {
         console.error(chalk.red('[connector]'), `invalid Telegram config JSON for agent ${row.agent_id}`)
         return null

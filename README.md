@@ -66,7 +66,7 @@ Plugins are configured through environment variables. Copy the relevant vars int
 
 | Plugin | Required Env Var |
 |--------|-----------------|
-| Brave Search | `BRAVE_SEARCH_API_KEY` |
+| Brave Search | `BRAVE_API_KEY` |
 | Gemini Image | `GEMINI_API_KEY` |
 | ElevenLabs | `ELEVENLABS_API_KEY` |
 | YouTube | `YOUTUBE_API_KEY` |

@@ -55,7 +55,7 @@ The `EventBus` (`server/src/event-bus.ts`) is an in-memory pub/sub. The WebSocke
 | `connector:started` | `{ agentId, platform }` | Slack/Telegram connector started |
 | `connector:stopped` | `{ agentId, platform }` | Connector stopped |
 | `connector:error` | `{ agentId, platform, error }` | Connector error |
-| `integration:config_updated` | `{ agentId, platform }` | Integration config changed (hot-reload) |
+| `channel:config_updated` | `{ agentId, platform }` | Channel config changed (hot-reload) |
 | `board:card_moved` | `{ cardId, boardId, laneId, title }` | Card moved on kanban |
 | `plugin:configured` | `{ pluginId }` | Plugin configured |
 
@@ -84,11 +84,11 @@ server/src/
 │   ├── todos/            # Todo management tools
 │   ├── scheduling/       # Schedule management tools
 │   ├── agent-mgmt/       # create_agent, manage agents
-│   ├── platform-comms/   # send_direct_message, channel_post
+│   ├── platform-comms/   # send_direct_message
 │   ├── messaging/        # Messaging tools
 │   └── board/            # Kanban board tools
 ├── connectors/
-│   ├── loader.ts         # Starts/stops connectors based on agent_integrations table
+│   ├── loader.ts         # Starts/stops connectors based on agent_channels table
 │   ├── slack/index.ts    # SlackConnector (Socket Mode via Bolt SDK)
 │   └── telegram/index.ts # TelegramConnector (long polling via Telegraf)
 ├── plugin-loader.ts      # Loads plugins from plugins/, manages env config
@@ -191,7 +191,7 @@ web/src/
 
 | Table | Purpose |
 |-------|---------|
-| `agent_integrations` | Per-agent Slack/Telegram credentials and config (JSON blob) |
+| `agent_channels` | Per-agent Slack/Telegram credentials and config (JSON blob) |
 | `platform_messages` | All inbound/outbound messages from external platforms (with thread, reply, reaction support) |
 
 ### Infrastructure

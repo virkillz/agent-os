@@ -66,4 +66,4 @@ React app with react-router-dom. Pages: Dashboard, Agents (roster/chat/settings/
 
 ### Data Storage
 
-SQLite database at `data/agentos.db`. Agent sessions stored at `data/sessions/{agentId}/`. Workspace files in `data/workspace/`. Database uses migrations at startup; schema includes agents, chat_messages, agent_memory, agent_todos, agent_schedules, invocation_queue, platform_messages, agent_integrations, and more.
+SQLite database at `data/agentos.db`. Agent sessions stored at `data/sessions/{agentId}/`. Workspace files in `data/workspace/`. Database uses migrations at startup; schema includes agents, chat_messages, agent_memory, agent_todos, agent_schedules, invocation_queue, platform_messages, agent_channels, and more.

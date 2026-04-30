@@ -12,11 +12,11 @@ import { PromptSection } from '../components/agent-settings/PromptSection.tsx'
 import { TerminateSection } from '../components/agent-settings/TerminateSection.tsx'
 import { SessionsSection } from '../components/agent-settings/SessionsSection.tsx'
 import { TriggersSection } from '../components/agent-settings/TriggersSection.tsx'
-import { IntegrationsSection } from '../components/agent-settings/IntegrationsSection.tsx'
+import { ChannelsSection } from '../components/agent-settings/ChannelsSection.tsx'
 import { ConnectionSection } from '../components/agent-settings/ConnectionSection.tsx'
 import { McpSection } from '../components/agent-settings/McpSection.tsx'
 
-type Section = 'profile' | 'avatar' | 'connection' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'integrations' | 'sessions' | 'terminate'
+type Section = 'profile' | 'avatar' | 'connection' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'channels' | 'sessions' | 'terminate'
 
 const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'profile', label: 'Profile' },
@@ -28,7 +28,7 @@ const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'mcp', label: 'MCP Servers' },
   { id: 'prompt', label: 'System Prompt' },
   { id: 'triggers', label: 'Triggers' },
-  { id: 'integrations', label: 'Integrations' },
+  { id: 'channels', label: 'Channels' },
   { id: 'sessions', label: 'Sessions' },
   { id: 'terminate', label: 'Terminate', danger: true },
 ]
@@ -206,7 +206,7 @@ export default function AgentSettings() {
         {section === 'mcp' && <McpSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'prompt' && id && <PromptSection agentId={id} />}
         {section === 'triggers' && id && <TriggersSection agentId={id} />}
-        {section === 'integrations' && id && <IntegrationsSection agentId={id} />}
+        {section === 'channels' && id && <ChannelsSection agentId={id} />}
         {section === 'sessions' && id && <SessionsSection agentId={id} />}
         {section === 'terminate' && id && <TerminateSection agent={agent} agentId={id} />}
       </div>

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { getDb } from '../db.js'
+import { getDb, getAgentChannelSessions } from '../db.js'
 import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir } from '../agent-runner.js'
 
 export interface AgentRow {
@@ -156,27 +156,65 @@ export function createAgentsRouter(): Router {
     res.json({ prompt })
   })
 
-  // GET /api/agents/:id/sessions — list session files
+  // GET /api/agents/:id/sessions — list session files recursively as a tree
   router.get('/:id/sessions', (req, res) => {
     const sessionsDir = resolveSessionsDir(req.params.id)
     if (!fs.existsSync(sessionsDir)) return res.json([])
-    const files = fs.readdirSync(sessionsDir)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(filename => {
-        const stat = fs.statSync(path.join(sessionsDir, filename))
-        return { filename, size: stat.size, mtime: stat.mtime.toISOString() }
+
+    const channelSessions = getAgentChannelSessions(req.params.id)
+    const channelMap = new Map(channelSessions.map(cs => [cs.id, cs]))
+
+    function buildTree(dir: string, relPath: string): unknown[] {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      const result: unknown[] = []
+
+      for (const entry of entries) {
+        const entryRelPath = relPath ? `${relPath}/${entry.name}` : entry.name
+        if (entry.isDirectory()) {
+          const cs = channelMap.get(entry.name)
+          const label = cs ? `${cs.platform} · ${cs.channel_key}` : entry.name
+          result.push({
+            name: entry.name,
+            path: entryRelPath,
+            type: 'dir',
+            label,
+            children: buildTree(path.join(dir, entry.name), entryRelPath),
+          })
+        } else if (entry.name.endsWith('.jsonl')) {
+          const stat = fs.statSync(path.join(dir, entry.name))
+          result.push({
+            name: entry.name,
+            path: entryRelPath,
+            type: 'file',
+            size: stat.size,
+            mtime: stat.mtime.toISOString(),
+          })
+        }
+      }
+
+      // Sort: dirs first, then by mtime descending
+      return result.sort((a: any, b: any) => {
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+        if (a.mtime && b.mtime) return b.mtime.localeCompare(a.mtime)
+        return a.name.localeCompare(b.name)
       })
-      .sort((a, b) => b.mtime.localeCompare(a.mtime))
-    res.json(files)
+    }
+
+    res.json(buildTree(sessionsDir, ''))
   })
 
-  // GET /api/agents/:id/sessions/:filename — read a session file
-  router.get('/:id/sessions/:filename', (req, res) => {
-    const { filename } = req.params
-    if (filename.includes('/') || filename.includes('..') || !filename.endsWith('.jsonl')) {
-      return res.status(400).json({ error: 'Invalid filename' })
+  // GET /api/agents/:id/sessions/:filepath(*) — read a session file
+  router.get('/:id/sessions/:filepath(*)', (req, res) => {
+    const filepath = req.params.filepath as string
+    if (filepath.includes('..') || !filepath.endsWith('.jsonl')) {
+      return res.status(400).json({ error: 'Invalid filepath' })
     }
-    const filePath = path.join(resolveSessionsDir(req.params.id), filename)
+    const filePath = path.join(resolveSessionsDir(req.params.id), filepath)
+    const resolved = path.resolve(filePath)
+    const base = path.resolve(resolveSessionsDir(req.params.id))
+    if (!resolved.startsWith(base)) {
+      return res.status(400).json({ error: 'Invalid filepath' })
+    }
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' })
     const lines = fs.readFileSync(filePath, 'utf-8')
       .split('\n')

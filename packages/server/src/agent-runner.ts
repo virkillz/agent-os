@@ -89,7 +89,11 @@ export function resolveSessionsDir(agentId: string): string {
   return path.join(dataDir, 'sessions', agentId)
 }
 
-export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): string {
+export function buildSystemPrompt(
+  agent: AgentRecord,
+  workspaceDir: string,
+  includeTodos = false,
+): string {
   // ── Layer 1: Identity prompt ─────────────────────────────────────────────
   const projectDir = path.dirname(workspaceDir)
   const identityBlock = agent.system_prompt
@@ -99,7 +103,7 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
 
   // ── Dynamic context: memory + todos ─────────────────────────────────────
   const memories = getAgentMemory(agent.id)
-  const todos = getAgentTodos(agent.id, true)
+  const todos = includeTodos ? getAgentTodos(agent.id, true) : []
 
   const memoryBlock = memories.length
     ? `## Your Memory\n${memories.map((m) => `- ${m.content}`).join('\n')}`
@@ -161,6 +165,7 @@ async function createLiveSession(
   defaultModel: ModelConfig,
   systemPromptOverride?: string,
   channelSessionId?: string,
+  includeTodos = false,
 ): Promise<LiveSession> {
   const config = resolveModelConfig(agent.model_config, defaultModel)
 
@@ -228,7 +233,7 @@ async function createLiveSession(
   if (!model) throw new Error(`Model not found: ${config.provider}/${config.modelId}`)
 
   const workspaceDir = resolveWorkspaceDir()
-  let systemPrompt = systemPromptOverride ?? buildSystemPrompt(agent, workspaceDir)
+  let systemPrompt = systemPromptOverride ?? buildSystemPrompt(agent, workspaceDir, includeTodos)
   if (mcp.sections.length > 0) {
     systemPrompt += '\n\n' + mcp.sections.join('\n\n')
   }
@@ -396,7 +401,7 @@ export async function chatWithChannel(
   const liveKey = `${agent.id}:${channelSession.id}`
 
   if (!liveSessions.has(liveKey)) {
-    const live = await createLiveSession(agent, defaultModel, undefined, channelSession.id)
+    const live = await createLiveSession(agent, defaultModel, undefined, channelSession.id, false)
     liveSessions.set(liveKey, live)
   }
 
@@ -501,7 +506,7 @@ export async function runScheduledTask(
   opts?: InvokeAgentOpts,
 ): Promise<string> {
   const workspaceDir = resolveWorkspaceDir()
-  const baseSystemPrompt = buildSystemPrompt(agent, workspaceDir)
+  const baseSystemPrompt = buildSystemPrompt(agent, workspaceDir, true)
   const systemPrompt = opts?.systemPromptAddendum
     ? `${baseSystemPrompt}\n\n${opts.systemPromptAddendum}`
     : baseSystemPrompt

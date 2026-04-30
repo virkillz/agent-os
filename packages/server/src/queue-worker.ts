@@ -187,6 +187,22 @@ export function enqueueInvocation(opts: {
 const processing = new Set<string>()
 
 export function startQueueWorker(): void {
+  // ── Recovery: reset rows stuck in processing for >5 min (crashed runs)
+  {
+    const db = getDb()
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+    const stuck = db.prepare(
+      "SELECT id FROM invocation_queue WHERE status = 'processing' AND created_at <= ?"
+    ).all(fiveMinAgo) as { id: number }[]
+    for (const row of stuck) {
+      db.prepare("UPDATE invocation_queue SET status = 'pending', retry_count = retry_count + 1 WHERE id = ?")
+        .run(row.id)
+      if (isDebugMode()) {
+        console.log(chalk.cyan('[queue-worker]'), chalk.yellow('recovered stuck row'), `queueId=${row.id}`)
+      }
+    }
+  }
+
   setInterval(async () => {
     const db = getDb()
     const now = new Date().toISOString()

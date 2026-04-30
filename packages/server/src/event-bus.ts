@@ -34,8 +34,8 @@ export type AppEvent =
   | { type: 'connector:started'; agentId: string; platform: string }
   | { type: 'connector:stopped'; agentId: string; platform: string }
   | { type: 'connector:error'; agentId: string; platform: string; error: string }
-  // Integration config events (used by connector loader to hot-reload)
-  | { type: 'integration:config_updated'; agentId: string; platform: string }
+  // Channel config events (used by connector loader to hot-reload)
+  | { type: 'channel:config_updated'; agentId: string; platform: string }
 
 type Handler = (event: AppEvent) => void
 

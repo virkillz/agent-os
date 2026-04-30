@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getDb, type AgentIntegrationRow, type PlatformMessageRow } from '../db.js'
+import { getDb, type AgentChannelRow, type PlatformMessageRow } from '../db.js'
 import { eventBus } from '../event-bus.js'
 import { connectorLoader } from '../connectors/loader.js'
 
@@ -19,14 +19,14 @@ function maskConfig(platform: string, rawConfig: string): Record<string, unknown
   }
 }
 
-export function createIntegrationsRouter(): Router {
+export function createChannelsRouter(): Router {
   const router = Router()
 
-  // GET /api/agents/:id/integrations
-  router.get('/:id/integrations', (req, res) => {
+  // GET /api/agents/:id/channels
+  router.get('/:id/channels', (req, res) => {
     const rows = getDb()
-      .prepare('SELECT * FROM agent_integrations WHERE agent_id = ? ORDER BY created_at ASC')
-      .all(req.params.id) as unknown as AgentIntegrationRow[]
+      .prepare('SELECT * FROM agent_channels WHERE agent_id = ? ORDER BY created_at ASC')
+      .all(req.params.id) as unknown as AgentChannelRow[]
 
     res.json(rows.map((r) => ({
       ...r,
@@ -35,8 +35,8 @@ export function createIntegrationsRouter(): Router {
     })))
   })
 
-  // POST /api/agents/:id/integrations
-  router.post('/:id/integrations', (req, res) => {
+  // POST /api/agents/:id/channels
+  router.post('/:id/channels', (req, res) => {
     const db = getDb()
     const agent = db.prepare('SELECT id FROM agents WHERE id = ?').get(req.params.id)
     if (!agent) return res.status(404).json({ error: 'Agent not found' })
@@ -49,40 +49,40 @@ export function createIntegrationsRouter(): Router {
     const configStr = JSON.stringify(config ?? {})
     try {
       db.prepare(
-        'INSERT INTO agent_integrations (agent_id, platform, config) VALUES (?, ?, ?)'
+        'INSERT INTO agent_channels (agent_id, platform, config) VALUES (?, ?, ?)'
       ).run(req.params.id, platform, configStr)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('UNIQUE')) {
-        return res.status(409).json({ error: `Integration for ${platform} already exists` })
+        return res.status(409).json({ error: `Channel for ${platform} already exists` })
       }
       throw err
     }
 
     const created = db
-      .prepare('SELECT * FROM agent_integrations WHERE agent_id = ? AND platform = ?')
-      .get(req.params.id, platform) as unknown as AgentIntegrationRow
+      .prepare('SELECT * FROM agent_channels WHERE agent_id = ? AND platform = ?')
+      .get(req.params.id, platform) as unknown as AgentChannelRow
 
-    eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform })
+    eventBus.emit({ type: 'channel:config_updated', agentId: req.params.id, platform })
     res.status(201).json({ ...created, config: maskConfig(platform, created.config), ...connectorLoader.statusOf(req.params.id, platform) })
   })
 
-  // GET /api/agents/:id/integrations/:iid
-  router.get('/:id/integrations/:iid', (req, res) => {
+  // GET /api/agents/:id/channels/:cid
+  router.get('/:id/channels/:cid', (req, res) => {
     const row = getDb()
-      .prepare('SELECT * FROM agent_integrations WHERE id = ? AND agent_id = ?')
-      .get(req.params.iid, req.params.id) as unknown as AgentIntegrationRow | undefined
-    if (!row) return res.status(404).json({ error: 'Integration not found' })
+      .prepare('SELECT * FROM agent_channels WHERE id = ? AND agent_id = ?')
+      .get(req.params.cid, req.params.id) as unknown as AgentChannelRow | undefined
+    if (!row) return res.status(404).json({ error: 'Channel not found' })
     res.json({ ...row, config: maskConfig(row.platform, row.config) })
   })
 
-  // PATCH /api/agents/:id/integrations/:iid
-  router.patch('/:id/integrations/:iid', (req, res) => {
+  // PATCH /api/agents/:id/channels/:cid
+  router.patch('/:id/channels/:cid', (req, res) => {
     const db = getDb()
     const row = db
-      .prepare('SELECT * FROM agent_integrations WHERE id = ? AND agent_id = ?')
-      .get(req.params.iid, req.params.id) as unknown as AgentIntegrationRow | undefined
-    if (!row) return res.status(404).json({ error: 'Integration not found' })
+      .prepare('SELECT * FROM agent_channels WHERE id = ? AND agent_id = ?')
+      .get(req.params.cid, req.params.id) as unknown as AgentChannelRow | undefined
+    if (!row) return res.status(404).json({ error: 'Channel not found' })
 
     const { config, enabled } = req.body as { config?: Record<string, unknown>; enabled?: number }
 
@@ -94,47 +94,47 @@ export function createIntegrationsRouter(): Router {
         // If value is '***', keep the existing value (client didn't change it)
         if (v !== '***') merged[k] = v
       }
-      db.prepare("UPDATE agent_integrations SET config = ?, updated_at = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE agent_channels SET config = ?, updated_at = datetime('now') WHERE id = ?")
         .run(JSON.stringify(merged), row.id)
     }
 
     if (enabled !== undefined) {
-      db.prepare("UPDATE agent_integrations SET enabled = ?, updated_at = datetime('now') WHERE id = ?")
+      db.prepare("UPDATE agent_channels SET enabled = ?, updated_at = datetime('now') WHERE id = ?")
         .run(enabled ? 1 : 0, row.id)
     }
 
     const updated = db
-      .prepare('SELECT * FROM agent_integrations WHERE id = ?')
-      .get(row.id) as unknown as AgentIntegrationRow
+      .prepare('SELECT * FROM agent_channels WHERE id = ?')
+      .get(row.id) as unknown as AgentChannelRow
 
-    eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform: updated.platform })
+    eventBus.emit({ type: 'channel:config_updated', agentId: req.params.id, platform: updated.platform })
     res.json({ ...updated, config: maskConfig(updated.platform, updated.config), ...connectorLoader.statusOf(req.params.id, updated.platform) })
   })
 
-  // POST /api/agents/:id/integrations/:iid/restart
-  router.post('/:id/integrations/:iid/restart', (req, res) => {
+  // POST /api/agents/:id/channels/:cid/restart
+  router.post('/:id/channels/:cid/restart', (req, res) => {
     const row = getDb()
-      .prepare('SELECT * FROM agent_integrations WHERE id = ? AND agent_id = ?')
-      .get(req.params.iid, req.params.id) as unknown as AgentIntegrationRow | undefined
-    if (!row) return res.status(404).json({ error: 'Integration not found' })
+      .prepare('SELECT * FROM agent_channels WHERE id = ? AND agent_id = ?')
+      .get(req.params.cid, req.params.id) as unknown as AgentChannelRow | undefined
+    if (!row) return res.status(404).json({ error: 'Channel not found' })
 
-    eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform: row.platform })
+    eventBus.emit({ type: 'channel:config_updated', agentId: req.params.id, platform: row.platform })
     res.json({ ok: true })
   })
 
-  // DELETE /api/agents/:id/integrations/:iid
-  router.delete('/:id/integrations/:iid', (req, res) => {
+  // DELETE /api/agents/:id/channels/:cid
+  router.delete('/:id/channels/:cid', (req, res) => {
     const db = getDb()
     const row = db
-      .prepare('SELECT * FROM agent_integrations WHERE id = ? AND agent_id = ?')
-      .get(req.params.iid, req.params.id) as unknown as AgentIntegrationRow | undefined
-    if (!row) return res.status(404).json({ error: 'Integration not found' })
+      .prepare('SELECT * FROM agent_channels WHERE id = ? AND agent_id = ?')
+      .get(req.params.cid, req.params.id) as unknown as AgentChannelRow | undefined
+    if (!row) return res.status(404).json({ error: 'Channel not found' })
 
     // Delete associated platform trigger rows
     db.prepare('DELETE FROM agent_triggers WHERE agent_id = ? AND platform = ?').run(req.params.id, row.platform)
-    db.prepare('DELETE FROM agent_integrations WHERE id = ?').run(row.id)
+    db.prepare('DELETE FROM agent_channels WHERE id = ?').run(row.id)
 
-    eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform: row.platform })
+    eventBus.emit({ type: 'channel:config_updated', agentId: req.params.id, platform: row.platform })
     res.json({ ok: true })
   })
 

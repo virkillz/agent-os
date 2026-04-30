@@ -4,7 +4,7 @@ import chalk from 'chalk'
 import { getDb } from '../../db.js'
 import { enqueueInvocation } from '../../queue-worker.js'
 import { endAndClearChannelSession } from '../../agent-runner.js'
-import type { Connector, TelegramIntegrationConfig } from '../types.js'
+import type { Connector, TelegramChannelConfig } from '../types.js'
 import { toTelegramText } from './format.js'
 import type { TelegramTriggerMeta } from './context.js'
 
@@ -12,11 +12,11 @@ export class TelegramConnector implements Connector {
   readonly platform = 'telegram' as const
   readonly agentId: string
 
-  private config: TelegramIntegrationConfig
   private bot: Telegraf
-  private botUsername: string | null = null
+  private botUsername?: string | null
+  private config: TelegramChannelConfig
 
-  constructor(agentId: string, config: TelegramIntegrationConfig) {
+  constructor(agentId: string, config: TelegramChannelConfig) {
     this.agentId = agentId
     this.config = config
     this.bot = new Telegraf(config.bot_token)

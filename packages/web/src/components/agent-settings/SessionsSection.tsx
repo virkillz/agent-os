@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, type SessionFile, type SessionEvent } from '../../api.ts'
+import { api, type SessionNode, type SessionEvent } from '../../api.ts'
+import { ChevronRightIcon } from './icons.tsx'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -22,6 +23,28 @@ function parseSessionLabel(filename: string): string {
   } catch {
     return filename.replace('.jsonl', '')
   }
+}
+
+// ─── Icons ──────────────────────────────────────────────────────────────────
+
+function FolderIcon({ open }: { open: boolean }) {
+  return (
+    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--muted)' }}>
+      {open ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+      )}
+    </svg>
+  )
+}
+
+function FileIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--subtle)' }}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+  )
 }
 
 // ─── Event renderers ────────────────────────────────────────────────────────
@@ -151,18 +174,113 @@ function EventRow({ event }: { event: SessionEvent }) {
   )
 }
 
+// ─── Tree node renderer ─────────────────────────────────────────────────────
+
+function TreeNode({
+  node,
+  depth,
+  expanded,
+  selected,
+  onToggle,
+  onSelect,
+}: {
+  node: SessionNode
+  depth: number
+  expanded: Set<string>
+  selected: string | null
+  onToggle: (path: string) => void
+  onSelect: (path: string) => void
+}) {
+  const isExpanded = expanded.has(node.path)
+  const isSelected = selected === node.path
+  const paddingLeft = 12 + depth * 14
+
+  if (node.type === 'dir') {
+    return (
+      <div>
+        <button
+          onClick={() => onToggle(node.path)}
+          className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 transition-colors"
+          style={{ paddingLeft, background: isSelected ? 'rgba(245,158,11,0.08)' : undefined }}
+        >
+          <ChevronRightIcon rotated={isExpanded} />
+          <FolderIcon open={isExpanded} />
+          <span className="text-xs truncate" style={{ color: 'var(--subtle)' }}>{node.label || node.name}</span>
+        </button>
+        {isExpanded && node.children?.map(child => (
+          <TreeNode
+            key={child.path}
+            node={child}
+            depth={depth + 1}
+            expanded={expanded}
+            selected={selected}
+            onToggle={onToggle}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => onSelect(node.path)}
+      className="w-full text-left px-2 py-1.5 transition-colors flex items-center gap-1.5"
+      style={{
+        paddingLeft,
+        background: isSelected ? 'rgba(245,158,11,0.08)' : undefined,
+        borderLeft: `2px solid ${isSelected ? 'rgb(var(--accent))' : 'transparent'}`,
+      }}
+    >
+      <FileIcon />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium truncate" style={{ color: isSelected ? 'var(--text-primary)' : 'var(--subtle)' }}>
+          {parseSessionLabel(node.name)}
+        </div>
+        <div className="text-[10px] text-muted/60 mt-0.5">{formatBytes(node.size ?? 0)}</div>
+      </div>
+    </button>
+  )
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function SessionsSection({ agentId }: { agentId: string }) {
-  const [files, setFiles] = useState<SessionFile[]>([])
+  const [tree, setTree] = useState<SessionNode[]>([])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<string | null>(null)
   const [events, setEvents] = useState<SessionEvent[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    api.sessions.list(agentId).then(f => {
-      setFiles(f)
-      if (f.length > 0) setSelected(f[0].filename)
+    api.sessions.list(agentId).then(nodes => {
+      setTree(nodes)
+      // Auto-expand all directories
+      const allDirs = new Set<string>()
+      function collectDirs(nodes: SessionNode[]) {
+        for (const n of nodes) {
+          if (n.type === 'dir') {
+            allDirs.add(n.path)
+            if (n.children) collectDirs(n.children)
+          }
+        }
+      }
+      collectDirs(nodes)
+      setExpanded(allDirs)
+
+      // Select first file
+      function findFirstFile(nodes: SessionNode[]): string | null {
+        for (const n of nodes) {
+          if (n.type === 'file') return n.path
+          if (n.type === 'dir' && n.children) {
+            const found = findFirstFile(n.children)
+            if (found) return found
+          }
+        }
+        return null
+      }
+      const firstFile = findFirstFile(nodes)
+      if (firstFile) setSelected(firstFile)
     })
   }, [agentId])
 
@@ -174,34 +292,38 @@ export function SessionsSection({ agentId }: { agentId: string }) {
       .finally(() => setLoading(false))
   }, [agentId, selected])
 
+  const toggle = (path: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
   return (
     <div className="flex-1 overflow-hidden flex">
-      {/* File list sidebar */}
+      {/* File tree sidebar */}
       <aside
-        className="w-56 flex-shrink-0 overflow-y-auto py-2"
+        className="w-64 flex-shrink-0 overflow-y-auto py-2"
         style={{ borderRight: '1px solid rgba(255,255,255,0.07)', background: 'rgb(var(--s1) / 0.6)' }}
       >
         <div className="px-3 mb-2">
           <p className="text-[10px] text-muted uppercase tracking-wider font-semibold">Sessions</p>
         </div>
-        {files.length === 0 && (
+        {tree.length === 0 && (
           <p className="text-xs text-muted/50 text-center py-8 px-3">No sessions yet.</p>
         )}
-        {files.map(f => (
-          <button
-            key={f.filename}
-            onClick={() => setSelected(f.filename)}
-            className="w-full text-left px-3 py-2 transition-colors"
-            style={{
-              background: selected === f.filename ? 'rgba(245,158,11,0.08)' : undefined,
-              borderLeft: `2px solid ${selected === f.filename ? 'rgb(var(--accent))' : 'transparent'}`,
-            }}
-          >
-            <div className="text-xs font-medium truncate" style={{ color: selected === f.filename ? 'var(--text-primary)' : 'var(--subtle)' }}>
-              {parseSessionLabel(f.filename)}
-            </div>
-            <div className="text-[10px] text-muted/60 mt-0.5">{formatBytes(f.size)}</div>
-          </button>
+        {tree.map(node => (
+          <TreeNode
+            key={node.path}
+            node={node}
+            depth={0}
+            expanded={expanded}
+            selected={selected}
+            onToggle={toggle}
+            onSelect={setSelected}
+          />
         ))}
       </aside>
 

@@ -107,7 +107,7 @@ export function createSchedulesRouter(): Router {
       res.status(404).json({ error: 'Not found' })
       return
     }
-    const systemPrompt = buildSystemPrompt(agent, resolveWorkspaceDir())
+    const systemPrompt = buildSystemPrompt(agent, resolveWorkspaceDir(), true)
     const prompt = `${systemPrompt}\n\n------------------------\nNow your current task is:\n${row.prompt}`
     res.json({ prompt })
   })
@@ -115,10 +115,16 @@ export function createSchedulesRouter(): Router {
   // DELETE /api/agents/:id/schedules/:sid
   router.delete('/:id/schedules/:sid', (req, res) => {
     const db = getDb()
-    db.prepare('DELETE FROM agent_schedules WHERE id = ? AND agent_id = ?')
-      .run(req.params.sid, req.params.id)
-    // Remove corresponding scheduler trigger
+    // Null out FK before deleting trigger (invocation_queue references agent_triggers)
+    db.prepare(`
+      UPDATE invocation_queue SET trigger_id = NULL
+      WHERE trigger_id IN (
+        SELECT id FROM agent_triggers WHERE type = 'scheduler' AND source_id = ? AND agent_id = ?
+      )
+    `).run(req.params.sid, req.params.id)
     db.prepare("DELETE FROM agent_triggers WHERE type = 'scheduler' AND source_id = ? AND agent_id = ?")
+      .run(req.params.sid, req.params.id)
+    db.prepare('DELETE FROM agent_schedules WHERE id = ? AND agent_id = ?')
       .run(req.params.sid, req.params.id)
     res.json({ ok: true })
   })

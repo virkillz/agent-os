@@ -227,7 +227,7 @@ For platform triggers, a context addendum (platform metadata + conversation hist
 - **Slack:** Socket Mode via Bolt SDK (persistent WebSocket, no public URL needed).
 - **Telegram:** Long polling via Telegraf (no public URL needed).
 - Connectors self-register triggers on first contact.
-- Hot-reload when integration config is updated via `integration:config_updated` event.
+- Hot-reload when channel config is updated via `channel:config_updated` event.
 
 ### Session Files
 
@@ -242,7 +242,7 @@ Agent conversations are persisted as JSONL files under `data/sessions/<agent-id>
 - **Schema management:** Raw `CREATE TABLE IF NOT EXISTS` statements in `packages/server/src/db.ts`, plus additive `ALTER TABLE` migrations.
 - **Migrations run automatically on startup** inside `initDb()`.
 
-**Key tables:** `settings`, `agents`, `users`, `roles`, `agent_roles`, `chat_messages`, `agent_memory`, `agent_todos`, `agent_schedules`, `agent_triggers`, `invocation_queue`, `agent_integrations`, `platform_messages`, `provider_accounts`, `plugins`, `notifications`, `sessions`, `mcp_servers`, `agent_mcp_servers`.
+**Key tables:** `settings`, `agents`, `users`, `roles`, `agent_roles`, `chat_messages`, `agent_memory`, `agent_todos`, `agent_schedules`, `agent_triggers`, `invocation_queue`, `agent_channels`, `platform_messages`, `provider_accounts`, `plugins`, `notifications`, `sessions`, `mcp_servers`, `agent_mcp_servers`.
 
 ---
 
@@ -270,7 +270,7 @@ Copy relevant vars into `.env` to enable plugins:
 | `ELEVENLABS_API_KEY` | ElevenLabs plugin |
 | `YOUTUBE_API_KEY` | YouTube plugin |
 
-Connector tokens (Slack app/bot tokens, Telegram bot tokens) are stored per-agent in the `agent_integrations` table, not in `.env`.
+Connector tokens (Slack app/bot tokens, Telegram bot tokens) are stored per-agent in the `agent_channels` table, not in `.env`.
 
 ---
 

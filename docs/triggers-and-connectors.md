@@ -217,7 +217,7 @@ Format responses using plain text; Telegram group chats don't always render mark
 ```
 [Trigger Context — Scheduler]
 You are running a scheduled task. No reply is needed — complete the task and use
-available tools (send_direct_message, channel_post) if you need to communicate results.
+available tools (send_direct_message) if you need to communicate results.
 ```
 
 Internal chat has no addendum (existing behavior unchanged).
@@ -339,12 +339,12 @@ Both platforms support this: Slack via `reactions.add`, Telegram via `setMessage
 
 See §4.1 for the full `agent_triggers` schema.
 
-### 7.2 Agent Integrations
+### 7.2 Agent Channels
 
 Stores per-agent credentials and configuration for each external platform.
 
 ```sql
-CREATE TABLE agent_integrations (
+CREATE TABLE agent_channels (
   id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   platform    TEXT NOT NULL,   -- 'slack' | 'telegram'
@@ -531,12 +531,12 @@ interface Connector {
 ### 9.4 Connector Loader
 
 On server startup, `connectorLoader.start()`:
-1. Queries `agent_integrations` for all enabled integrations
+1. Queries `agent_channels` for all enabled channels
 2. Instantiates the appropriate `Connector` for each row
 3. Calls `connector.start()` on each
-4. Subscribes to `integration:config_updated` events to hot-reload connectors
+4. Subscribes to `channel:config_updated` events to hot-reload connectors
 
-When an integration is added/updated/removed via API, the loader stops the old connector (if any) and starts a new one.
+When a channel is added/updated/removed via API, the loader stops the old connector (if any) and starts a new one.
 
 ### 9.5 Inbound Message Flow
 
