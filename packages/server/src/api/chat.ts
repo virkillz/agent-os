@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getDb, getSetting } from '../db.js'
+import { getDb } from '../db.js'
 import { chatWithAgent, clearSession, type AgentRecord } from '../agent-runner.js'
 import type { AgentRow } from './agents.js'
 
@@ -11,11 +11,7 @@ interface MessageRow {
   created_at: string
 }
 
-function getDefaultModel() {
-  const stored = getSetting('default_model')
-  if (stored) {
-    try { return JSON.parse(stored) } catch { /* fall through */ }
-  }
+function getFallbackModel() {
   return { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.5', thinkingLevel: 'low' }
 }
 
@@ -57,7 +53,7 @@ export function createChatRouter(): Router {
         source: agent.source,
       }
 
-      const reply = await chatWithAgent(agentRecord, message.trim(), getDefaultModel())
+      const reply = await chatWithAgent(agentRecord, message.trim(), getFallbackModel())
 
       // Persist assistant reply
       getDb()

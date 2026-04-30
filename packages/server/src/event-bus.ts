@@ -25,7 +25,6 @@ export type AppEvent =
   // Notification events
   | { type: 'notification:created'; notification: NotificationRow }
   // Provider account events
-  | { type: 'provider_account:cooldown'; accountId: string; provider: string; cooldownMinutes: number }
   // Invocation queue events
   | { type: 'invocation:queued'; agentId: string; triggerType: string; queueId: number }
   | { type: 'invocation:completed'; agentId: string; triggerType: string; queueId: number }

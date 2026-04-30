@@ -38,7 +38,7 @@ export default function SettingsPrompt() {
             Platform Prompt
           </h2>
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-            The base system prompt injected into every agent session. Applied before role and identity prompts.
+            The base system prompt injected into every agent session. Applied before the agent's identity prompt.
           </p>
         </div>
 

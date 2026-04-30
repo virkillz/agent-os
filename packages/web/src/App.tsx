@@ -14,14 +14,10 @@ import AgentTodos from './pages/AgentTodos.tsx'
 import AgentSchedule from './pages/AgentSchedule.tsx'
 import Settings from './pages/Settings.tsx'
 import SettingsProvider from './pages/settings/Provider.tsx'
-import SettingsProviderAccounts from './pages/settings/ProviderAccounts.tsx'
-import SettingsModel from './pages/settings/Model.tsx'
 import SettingsExtensions from './pages/settings/Extensions.tsx'
 import SettingsMcp from './pages/settings/Mcp.tsx'
 import SettingsSkills from './pages/settings/Skills.tsx'
-import SettingsRoles from './pages/settings/Roles.tsx'
 import SettingsAppearance from './pages/settings/Appearance.tsx'
-import SettingsCompany from './pages/settings/Company.tsx'
 import SettingsPrompt from './pages/settings/Prompt.tsx'
 import Workspace from './pages/Workspace.tsx'
 import Board from './pages/Board.tsx'
@@ -135,15 +131,11 @@ export default function App() {
             <Route path="/workspace" element={<Workspace />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />}>
-              <Route index element={<Navigate to="/settings/company" replace />} />
-              <Route path="company" element={<SettingsCompany />} />
+              <Route index element={<Navigate to="/settings/prompt" replace />} />
               <Route path="provider" element={<SettingsProvider />} />
-              <Route path="accounts" element={<SettingsProviderAccounts />} />
-              <Route path="model" element={<SettingsModel />} />
               <Route path="extensions" element={<SettingsExtensions />} />
               <Route path="mcp" element={<SettingsMcp />} />
               <Route path="skills" element={<SettingsSkills />} />
-              <Route path="roles" element={<SettingsRoles />} />
               <Route path="prompt" element={<SettingsPrompt />} />
               <Route path="appearance" element={<SettingsAppearance />} />
             </Route>

@@ -19,9 +19,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export interface Settings {
   firstRun: boolean
   needsSetup: boolean
-  companyLogo: string
   platformPrompt: string
-  defaultModel: { provider: string; modelId: string; thinkingLevel: string }
 }
 
 export interface Provider {
@@ -70,21 +68,6 @@ export const api = {
         .then(r => r.json()) as Promise<User>
     },
     delete: (id: string) => req<{ ok: boolean }>('DELETE', `/users/${id}`),
-  },
-
-  // ─── Roles ────────────────────────────────────────────────────────────────
-
-  roles: {
-    list: () => req<Role[]>('GET', '/roles'),
-    get: (id: string) => req<Role>('GET', `/roles/${id}`),
-    create: (data: { name: string; description?: string; prompt?: string }) =>
-      req<Role>('POST', '/roles', data),
-    update: (id: string, data: { name?: string; description?: string; prompt?: string }) =>
-      req<Role>('PUT', `/roles/${id}`, data),
-    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/roles/${id}`),
-    forAgent: (agentId: string) => req<Role[]>('GET', `/roles/agent/${agentId}`),
-    assignToAgent: (agentId: string, roleIds: string[]) =>
-      req<Role[]>('PUT', `/roles/agent/${agentId}`, { roleIds }),
   },
 
   // ─── Agents ───────────────────────────────────────────────────────────────
@@ -288,16 +271,6 @@ export const api = {
 
   // ─── Provider Accounts ────────────────────────────────────────────────────
 
-  providerAccounts: {
-    list: () => req<ProviderAccount[]>('GET', '/provider-accounts'),
-    create: (data: { providerId: string; label: string; apiKey: string }) =>
-      req<ProviderAccount>('POST', '/provider-accounts', data),
-    update: (id: string, data: { label?: string; apiKey?: string; isActive?: boolean }) =>
-      req<ProviderAccount>('PUT', `/provider-accounts/${id}`, data),
-    delete: (id: string) => req<{ ok: boolean }>('DELETE', `/provider-accounts/${id}`),
-    clearCooldown: (id: string) => req<{ ok: boolean }>('POST', `/provider-accounts/${id}/clear-cooldown`),
-  },
-
   connectionProfiles: {
     list: () => req<ConnectionProfile[]>('GET', '/connection-profiles'),
     presets: () => req<ProviderPreset[]>('GET', '/connection-profiles/presets'),
@@ -385,14 +358,6 @@ export interface User {
   created_at: string
 }
 
-export interface Role {
-  id: string
-  name: string
-  description: string
-  prompt: string
-  created_at: string
-}
-
 export interface Agent {
   id: string
   name: string
@@ -418,17 +383,6 @@ export interface CreateAgentInput {
   modelConfig?: { provider?: string; modelId?: string; thinkingLevel?: string; accountId?: string; connectionProfileId?: string }
   avatarUrl?: string
   avatarColor?: string
-}
-
-export interface ProviderAccount {
-  id: string
-  providerId: string
-  label: string
-  maskedKey: string
-  isActive: boolean
-  cooldownUntil: string | null
-  createdAt: string
-  updatedAt: string
 }
 
 export interface ConnectionProfile {

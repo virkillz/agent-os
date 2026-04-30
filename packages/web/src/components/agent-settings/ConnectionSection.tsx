@@ -42,6 +42,7 @@ export function ConnectionSection({
             </p>
             <p className="text-xs text-muted">
               Choose which connection profile this agent uses to connect to the AI provider.
+              If none is selected, the agent will use the built-in default.
             </p>
           </div>
 
@@ -52,7 +53,7 @@ export function ConnectionSection({
               value={selectedId}
               onChange={e => setSelectedId(e.target.value)}
             >
-              <option value="">Use default model settings</option>
+              <option value="">Built-in default</option>
               {profiles.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.providerType}){p.isDefault ? ' — Default' : ''}
@@ -61,7 +62,7 @@ export function ConnectionSection({
             </select>
             {profiles.length === 0 && (
               <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>
-                No profiles yet. <a href="/settings/provider" className="text-accent hover:underline">Create one in Settings</a>.
+                No profiles yet. <a href="/settings/provider" className="text-accent hover:underline">Create one in Settings -&gt; Provider</a>.
               </p>
             )}
           </div>

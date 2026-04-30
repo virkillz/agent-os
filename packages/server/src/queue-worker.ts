@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { getDb, getSetting, type InvocationQueueRow } from './db.js'
+import { getDb, type InvocationQueueRow } from './db.js'
 import { invokeAgent, isDebugMode, type AgentRecord, type ModelConfig } from './agent-runner.js'
 import { eventBus } from './event-bus.js'
 import { connectorLoader } from './connectors/loader.js'
@@ -58,13 +58,7 @@ function buildPlatformAddendum(
   return [contextText, historyText].filter(Boolean).join('\n\n')
 }
 
-function getDefaultModel(): ModelConfig {
-  const stored = getSetting('default_model')
-  if (stored) {
-    try {
-      return JSON.parse(stored) as ModelConfig
-    } catch { /* fall through */ }
-  }
+function getFallbackModel(): ModelConfig {
   return { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.5', thinkingLevel: 'low' }
 }
 
@@ -114,7 +108,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
   const systemPromptAddendum = ctx ? buildPlatformAddendum(ctx, row.agent_id, historyWindow) : undefined
 
   try {
-    const response = await invokeAgent(agent, payload.prompt, getDefaultModel(), {
+    const response = await invokeAgent(agent, payload.prompt, getFallbackModel(), {
       systemPromptAddendum,
       rawPrompt: ctx !== undefined,
     })

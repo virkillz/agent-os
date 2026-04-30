@@ -15,12 +15,11 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
-import { getAgentMemory, getAgentTodos, getAgentRoles, getAllAgents, getDb, type ConnectionProfileRow } from './db.js'
+import { getAgentMemory, getAgentTodos, getAllAgents, getDb, type ConnectionProfileRow } from './db.js'
 import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
 import { pluginLoader } from './plugin-loader.js'
-import { pickAccount, markCooldown, getCooldownMinutes } from './account-pool.js'
 
 let debugMode = false
 
@@ -45,7 +44,6 @@ export interface ModelConfig {
   tools?: string[]
   disabledTools?: string[]
   allowedSkills?: string[]
-  accountId?: string
   connectionProfileId?: string
 }
 
@@ -62,7 +60,6 @@ export interface AgentRecord {
 interface LiveSession {
   session: Awaited<ReturnType<typeof createAgentSession>>['session']
   unsubscribe: (() => void) | null
-  accountId: string | null
 }
 
 // One persistent session per agent, keyed by agent ID.
@@ -86,13 +83,7 @@ export function resolveSessionsDir(agentId: string): string {
 }
 
 export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): string {
-  // ── Layer 1: Role prompts ────────────────────────────────────────────────
-  const roles = getAgentRoles(agent.id)
-  const roleBlock = roles.length
-    ? roles.map((r) => `## Role: ${r.name}\n${r.prompt}`).join('\n\n')
-    : ''
-
-  // ── Layer 4: Identity prompt ─────────────────────────────────────────────
+  // ── Layer 1: Identity prompt ─────────────────────────────────────────────
   const projectDir = path.dirname(workspaceDir)
   const identityBlock = agent.system_prompt
     .trim()
@@ -150,7 +141,7 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     `## How You Work\n\nAs a virtual employee, here is how you operate.\n\n` +
     toolSections.join('\n\n')
 
-  return [identityBlock, roleBlock, toolsBlock, agentsBlock, memoryBlock, todoBlock]
+  return [identityBlock, toolsBlock, agentsBlock, memoryBlock, todoBlock]
     .filter(Boolean)
     .join('\n\n')
 }
@@ -261,19 +252,13 @@ async function createLiveSession(
   })
   await loader.reload()
 
-  // Resolve provider account — prefer connection profile key, then agent's accountId, fall back to env-var auth
+  // Resolve auth — prefer connection profile key, fall back to env-var auth
   const authStorage = AuthStorage.inMemory()
   if (connectionProfile?.api_key) {
     authStorage.setRuntimeApiKey(config.provider, connectionProfile.api_key)
     if (debugMode) dbg(agent.name, chalk.dim(`auth: connection profile key for "${connectionProfile.name}"`))
-  } else {
-    const account = pickAccount(config.provider, config.accountId)
-    if (account) {
-      authStorage.setRuntimeApiKey(config.provider, account.api_key)
-      if (debugMode) dbg(agent.name, chalk.dim(`auth: account "${account.label}" (${account.id})`))
-    } else if (debugMode) {
-      dbg(agent.name, chalk.dim('auth: falling back to env var'))
-    }
+  } else if (debugMode) {
+    dbg(agent.name, chalk.dim('auth: falling back to env var'))
   }
 
   const { session } = await createAgentSession({
@@ -288,7 +273,7 @@ async function createLiveSession(
     sessionManager: SessionManager.create(dataDir, sessionsDir),
   })
 
-  const liveSession: LiveSession = { session, unsubscribe: null, accountId: null }
+  const liveSession: LiveSession = { session, unsubscribe: null }
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     const p = pending.get(agent.id)
@@ -337,25 +322,6 @@ async function createLiveSession(
         case 'auto_retry_end':
           dbg(agent.name, chalk.red('↺ retry_end'), event.success ? chalk.green('success') : chalk.red('failed'), event.finalError ?? '')
           break
-      }
-    }
-
-    // 429 / rate-limit detection: put account on cooldown and kill session
-    if (event.type === 'auto_retry_start' && liveSession.accountId) {
-      const is429 = /429|rate.?limit|too.?many.?request/i.test(event.errorMessage)
-      if (is429) {
-        const mins = getCooldownMinutes()
-        markCooldown(liveSession.accountId, mins)
-        eventBus.emit({
-          type: 'provider_account:cooldown',
-          accountId: liveSession.accountId,
-          provider: config.provider,
-          cooldownMinutes: mins,
-        })
-        console.log(`[agent-runner] Account ${liveSession.accountId} (${config.provider}) on cooldown for ${mins}m — 429 received`)
-        // Drop session so next chatWithAgent call picks a fresh account
-        liveSessions.delete(agent.id)
-        if (liveSession.unsubscribe) liveSession.unsubscribe()
       }
     }
 

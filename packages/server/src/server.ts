@@ -15,12 +15,10 @@ import { createSchedulesRouter } from './api/schedules.js'
 import { createWorkspaceRouter } from './api/workspace.js'
 import { createPluginsRouter } from './api/plugins.js'
 import { createUsersRouter, createSetupRouter } from './api/users.js'
-import { createRolesRouter } from './api/roles.js'
 // import { createBoardsRouter } from './api/boards.js'
 import { createSkillsRouter } from './api/skills.js'
 import { createPlatformToolsRouter } from './api/platform-tools.js'
 import { createNotificationsRouter } from './api/notifications.js'
-import { createProviderAccountsRouter } from './api/provider-accounts.js'
 import { createTriggersRouter } from './api/triggers.js'
 import { createIntegrationsRouter } from './api/integrations.js'
 import { createConnectionProfilesRouter } from './api/connection-profiles.js'
@@ -61,10 +59,8 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
   app.use('/api/skills', createSkillsRouter(opts.workspaceDir ?? process.cwd()))
 
   // ── New platform primitives ─────────────────────────────────────────────────
-  app.use('/api/roles', createRolesRouter())
   // app.use('/api/boards', createBoardsRouter())
   app.use('/api/notifications', createNotificationsRouter())
-  app.use('/api/provider-accounts', createProviderAccountsRouter())
   app.use('/api/agents', createTriggersRouter())
   app.use('/api/agents', createIntegrationsRouter())
   app.use('/api/connection-profiles', createConnectionProfilesRouter())

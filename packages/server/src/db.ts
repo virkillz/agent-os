@@ -338,42 +338,6 @@ function runMigrations(db: DB): void {
 }
 
 function seedInitialData(db: DB): void {
-  // Seed default Tech Magazine roles if none exist
-  const roleCount = (db.prepare('SELECT COUNT(*) as c FROM roles').get() as { c: number }).c
-  if (roleCount === 0) {
-    const defaultRoles = [
-      {
-        name: 'Writer',
-        description: 'Researches topics and writes articles.',
-        prompt: 'You are a skilled writer. Your primary responsibility is to research topics thoroughly and produce well-structured, engaging articles. Write clearly and concisely. Always cite your sources in your work notes.',
-      },
-      {
-        name: 'Editor',
-        description: 'Reviews and refines content for quality and consistency.',
-        prompt: 'You are a meticulous editor. Review all content for clarity, grammar, factual accuracy, and consistency with the publication\'s voice. Provide constructive feedback and make improvements directly when authorised.',
-      },
-      {
-        name: 'Researcher',
-        description: 'Gathers facts, data, and sources to support content.',
-        prompt: 'You are a thorough researcher. Your job is to find accurate, up-to-date information on assigned topics. Summarise findings clearly and organise them so writers and editors can use them directly.',
-      },
-      {
-        name: 'Publisher',
-        description: 'Manages publication schedule and final approvals.',
-        prompt: 'You are the publisher. You oversee the production pipeline, ensure deadlines are met, and give final approval before content is released. Coordinate between writers, editors, and external platforms.',
-      },
-      {
-        name: 'Art Director',
-        description: 'Oversees visual assets and image generation.',
-        prompt: 'You are the art director. You are responsible for all visual content — cover images, illustrations, and layout decisions. Work with the writer to ensure visuals match the article tone and generate images using available tools.',
-      },
-    ]
-    for (const r of defaultRoles) {
-      db.prepare('INSERT INTO roles (id, name, description, prompt) VALUES (?, ?, ?, ?)')
-        .run(randomUUID(), r.name, r.description, r.prompt)
-    }
-  }
-
   // Seed default agents if none exist
   const agentCount = (db.prepare('SELECT COUNT(*) as c FROM agents').get() as { c: number }).c
   if (agentCount === 0) {
@@ -473,25 +437,6 @@ export interface UserRow {
   password_hash: string
   is_admin: number
   created_at: string
-}
-
-export interface RoleRow {
-  id: string
-  name: string
-  description: string
-  prompt: string
-  created_at: string
-}
-
-export interface ProviderAccountRow {
-  id: string
-  provider_id: string
-  label: string
-  api_key: string
-  is_active: number
-  cooldown_until: string | null
-  created_at: string
-  updated_at: string
 }
 
 export interface ConnectionProfileRow {
@@ -612,44 +557,10 @@ export function getAgentTodos(agentId: string, onlyOpen = false): TodoRow[] {
   return getDb().prepare(query).all(agentId) as unknown as TodoRow[]
 }
 
-export function getAgentRoles(agentId: string): RoleRow[] {
-  return getDb()
-    .prepare(`
-      SELECT r.* FROM roles r
-      JOIN agent_roles ar ON ar.role_id = r.id
-      WHERE ar.agent_id = ?
-    `)
-    .all(agentId) as unknown as RoleRow[]
-}
-
 export function getAllAgents(): { id: string; name: string; role: string }[] {
   return getDb()
     .prepare('SELECT id, name, role FROM agents ORDER BY name ASC')
     .all() as { id: string; name: string; role: string }[]
 }
 
-// ── Provider account helpers ──────────────────────────────────────────────────
 
-export function getAvailableAccountsForProvider(providerId: string): ProviderAccountRow[] {
-  const now = new Date().toISOString()
-  return getDb()
-    .prepare(
-      `SELECT * FROM provider_accounts
-       WHERE provider_id = ? AND is_active = 1
-         AND (cooldown_until IS NULL OR cooldown_until <= ?)
-       ORDER BY created_at ASC`
-    )
-    .all(providerId, now) as unknown as ProviderAccountRow[]
-}
-
-export function setAccountCooldown(accountId: string, untilIso: string): void {
-  getDb()
-    .prepare("UPDATE provider_accounts SET cooldown_until = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(untilIso, accountId)
-}
-
-export function clearAccountCooldown(accountId: string): void {
-  getDb()
-    .prepare("UPDATE provider_accounts SET cooldown_until = NULL, updated_at = datetime('now') WHERE id = ?")
-    .run(accountId)
-}

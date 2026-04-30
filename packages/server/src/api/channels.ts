@@ -9,7 +9,6 @@ import {
 import { requireAuth, requireAdmin, type AuthRequest } from '../auth.js'
 import { eventBus } from '../event-bus.js'
 import { chatWithAgent, type AgentRecord } from '../agent-runner.js'
-import { getSetting } from '../db.js'
 import type { AgentRow } from './agents.js'
 
 // ── @mention detection ────────────────────────────────────────────────────────
@@ -20,11 +19,7 @@ function extractMentions(content: string): string[] {
   return matches.map((m) => m.slice(1).toLowerCase())
 }
 
-function getDefaultModel() {
-  const stored = getSetting('default_model')
-  if (stored) {
-    try { return JSON.parse(stored) } catch { /* fall through */ }
-  }
+function getFallbackModel() {
   return { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.5', thinkingLevel: 'low' }
 }
 
@@ -70,7 +65,7 @@ async function triggerAgentResponse(
   }
 
   try {
-    const reply = await chatWithAgent(agentRecord, prompt, getDefaultModel())
+    const reply = await chatWithAgent(agentRecord, prompt, getFallbackModel())
 
     const msgId = (getDb()
       .prepare('INSERT INTO channel_messages (channel_id, sender_id, sender_type, content) VALUES (?, ?, ?, ?)')

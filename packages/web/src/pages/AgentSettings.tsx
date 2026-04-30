@@ -5,7 +5,6 @@ import AgentDetailModal from '../components/AgentDetailModal.tsx'
 import PageHeader from '../components/PageHeader.tsx'
 import { ProfileSection } from '../components/agent-settings/ProfileSection.tsx'
 import { AvatarSection } from '../components/agent-settings/AvatarSection.tsx'
-import { ModelSection } from '../components/agent-settings/ModelSection.tsx'
 import { SkillsSection } from '../components/agent-settings/SkillsSection.tsx'
 import { PluginsSection } from '../components/agent-settings/PluginsSection.tsx'
 import { PlatformToolsSection } from '../components/agent-settings/PlatformToolsSection.tsx'
@@ -17,13 +16,12 @@ import { IntegrationsSection } from '../components/agent-settings/IntegrationsSe
 import { ConnectionSection } from '../components/agent-settings/ConnectionSection.tsx'
 import { McpSection } from '../components/agent-settings/McpSection.tsx'
 
-type Section = 'profile' | 'avatar' | 'connection' | 'model' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'integrations' | 'sessions' | 'terminate'
+type Section = 'profile' | 'avatar' | 'connection' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'integrations' | 'sessions' | 'terminate'
 
 const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'avatar', label: 'Avatar' },
   { id: 'connection', label: 'Connection' },
-  { id: 'model', label: 'Model' },
   { id: 'skills', label: 'Skills' },
   { id: 'platform-tools', label: 'Platform Tools' },
   { id: 'plugins', label: 'Plugins' },
@@ -202,7 +200,6 @@ export default function AgentSettings() {
         {section === 'profile' && <ProfileSection agent={agent} onSave={handleSave} />}
         {section === 'avatar' && <AvatarSection agent={agent} onSave={handleSave} />}
         {section === 'connection' && <ConnectionSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
-        {section === 'model' && <ModelSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'skills' && <SkillsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'platform-tools' && <PlatformToolsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
         {section === 'plugins' && <PluginsSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
