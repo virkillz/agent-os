@@ -57,6 +57,7 @@ The `EventBus` (`server/src/event-bus.ts`) is an in-memory pub/sub. The WebSocke
 | `connector:error` | `{ agentId, platform, error }` | Connector error |
 | `channel:config_updated` | `{ agentId, platform }` | Channel config changed (hot-reload) |
 | `board:card_moved` | `{ cardId, boardId, laneId, title }` | Card moved on kanban |
+| `connected` | — | WebSocket client connected (welcome ping) |
 | `plugin:configured` | `{ pluginId }` | Plugin configured |
 
 ---
@@ -69,13 +70,14 @@ The `EventBus` (`server/src/event-bus.ts`) is an in-memory pub/sub. The WebSocke
 server/src/
 ├── index.ts              # CLI entry (agentos init, agentos start), bootstraps all services
 ├── server.ts             # Express app: mounts routers, WS init, queue worker, connectors
+├── ws.ts                 # WebSocket server on /ws, broadcasts events to connected clients
 ├── db.ts                 # SQLite schema, migrations, WAL mode, foreign keys, seed data
-├── agent-runner.ts       # Pi SDK session lifecycle: chatWithAgent(), invokeAgent(), buildSystemPrompt()
+├── auth.ts               # scrypt password hashing, session middleware (requireAuth, requireAdmin)
+├── agent-runner.ts       # Pi SDK session lifecycle: chatWithAgent(), chatWithChannel(), invokeAgent(), buildSystemPrompt()
 ├── scheduler.ts          # 60s cron poll, enqueues due tasks to invocation_queue
 ├── queue-worker.ts       # 5s poll on invocation_queue, processes one agent at a time with retry
 ├── event-bus.ts          # Typed AppEvent union, emit(), on()
 ├── notification-service.ts # Maps domain events to persistent notifications
-├── account-pool.ts       # Provider account selection with cooldown management
 ├── platform-tools.ts     # Composes platform tools + plugin tools for each agent
 ├── platform-tools/
 │   ├── loader.ts         # Registry: getDefaultToolIds(), getToolsForIds(), getSystemPromptSections()
@@ -83,42 +85,49 @@ server/src/
 │   ├── memory/           # memory_add tool
 │   ├── todos/            # Todo management tools
 │   ├── scheduling/       # Schedule management tools
-│   ├── agent-mgmt/       # create_agent, manage agents
 │   ├── platform-comms/   # send_direct_message
-│   ├── messaging/        # Messaging tools
-│   └── board/            # Kanban board tools
+│   ├── conversation-search/ # search_conversation_history tool
+│   └── board/            # Kanban board tools (not yet wired to API)
 ├── connectors/
 │   ├── loader.ts         # Starts/stops connectors based on agent_channels table
-│   ├── slack/index.ts    # SlackConnector (Socket Mode via Bolt SDK)
-│   └── telegram/index.ts # TelegramConnector (long polling via Telegraf)
+│   ├── types.ts          # Connector interface, InboundMessage, TriggerContext
+│   ├── slack/
+│   │   ├── index.ts      # SlackConnector (Socket Mode via Bolt SDK)
+│   │   ├── context.ts    # SlackTriggerMeta type
+│   │   └── format.ts     # Slack markdown formatting
+│   └── telegram/
+│       ├── index.ts      # TelegramConnector (long polling via Telegraf)
+│       ├── context.ts    # TelegramTriggerMeta type
+│       └── format.ts     # Telegram text formatting
 ├── plugin-loader.ts      # Loads plugins from plugins/, manages env config
-├── plugins/              # Optional plugins: remotion, elevenlabs, gemini-image, etc.
+├── plugins/              # Optional plugins: brave-search, elevenlabs, gemini-image, youtube, remotion, hacker-news, fetch-content
+├── mcp-client.ts         # MCP (Model Context Protocol) client integration
 └── api/
-    ├── agents.ts         # Agent CRUD, is_active toggle, role assignment
-    ├── chat.ts           # Direct agent chat (chat_messages table)
+    ├── agents.ts         # Agent CRUD, is_active toggle, session file browser
+    ├── chat.ts           # Direct agent chat (chat_messages + platform_messages tables)
     ├── memory.ts         # Agent memory CRUD
     ├── todos.ts          # Agent todo CRUD
     ├── schedules.ts      # Agent schedule CRUD
     ├── triggers.ts       # Trigger registry: list, enable/disable, preview prompt, invocation history
-    ├── integrations.ts   # Slack/Telegram integration CRUD, platform message query
-    ├── roles.ts          # Role CRUD, default role seeding
+    ├── channels.ts       # Slack/Telegram channel CRUD, platform message query, connector restart
     ├── users.ts          # Human user CRUD, auth, login/logout, avatar upload
     ├── plugins.ts        # Plugin registry, configure/remove
     ├── platform-tools.ts # List available platform tools
-    ├── skills.ts         # List available skills
+    ├── skills.ts         # List/install/uninstall skills
     ├── notifications.ts  # Notifications list, mark read
-    ├── provider-accounts.ts # Provider account key management
+    ├── connection-profiles.ts # LLM connection profile management (replaces provider-accounts)
+    ├── mcp.ts            # MCP server registry, agent↔server junction
     ├── workspace.ts      # Workspace file browser
-    └── settings.ts       # Company settings, default model, platform prompt
+    └── settings.ts       # Company settings, platform prompt, provider API keys
 ```
 
 ### Frontend
 
 ```
 web/src/
-├── App.tsx               # Auth gate: first-run → onboarding, then login, then layout
-├── store.ts              # Zustand state: agents, memory, todos, schedules, notifications, plugins, workspace
-├── api.ts                # Typed fetch client organized by domain
+├── App.tsx               # Auth gate: first-run → onboarding, then login, then layout + routing
+├── store.ts              # Zustand state: agents, memory, todos, schedules, notifications, plugins, workspace, MCP servers
+├── api.ts                # Typed fetch client organized by domain + all shared TypeScript types
 ├── hooks/
 │   └── useAppEvents.ts   # WebSocket event listener hook
 ├── contexts/
@@ -129,7 +138,22 @@ web/src/
 │   ├── AgentDetailModal.tsx
 │   ├── NotificationCenter.tsx
 │   ├── PageHeader.tsx
-│   └── agent-settings/    # Settings sub-components: Profile, Prompt, Model, Plugins, etc.
+│   └── agent-settings/    # Settings sub-components per tab
+│       ├── ProfileSection.tsx
+│       ├── AvatarSection.tsx
+│       ├── PromptSection.tsx
+│       ├── PlatformToolsSection.tsx
+│       ├── SkillsSection.tsx
+│       ├── PluginsSection.tsx
+│       ├── McpSection.tsx
+│       ├── ConnectionSection.tsx
+│       ├── ChannelsSection.tsx
+│       ├── SessionsSection.tsx
+│       ├── ScheduleSection.tsx
+│       ├── MemorySection.tsx
+│       ├── TodosSection.tsx
+│       ├── TriggersSection.tsx
+│       └── TerminateSection.tsx
 └── pages/
     ├── Login.tsx          # Username/password gate
     ├── Onboarding.tsx     # First-run setup wizard
@@ -138,20 +162,21 @@ web/src/
     ├── Users.tsx          # Human user management
     ├── AgentProfile.tsx   # Agent profile view
     ├── AgentChat.tsx      # Direct agent chat
-    ├── AgentSettings.tsx  # Agent configuration (tools, plugins, model, integrations, triggers)
+    ├── AgentSettings.tsx  # Agent configuration (tabs for all sub-components above)
     ├── AgentMemory.tsx    # Agent memory viewer/editor
     ├── AgentTodos.tsx     # Agent todo list
     ├── AgentSchedule.tsx  # Agent schedule management
     ├── Workspace.tsx      # Workspace file browser
+    ├── Explorer.tsx       # Session file explorer
+    ├── Board.tsx          # Kanban board (frontend only — API not yet wired)
+    ├── Skills.tsx         # Skill manager (install/uninstall)
+    ├── Plugins.tsx        # Plugin manager
     ├── Notifications.tsx  # Notification center page
     └── settings/
-        ├── Company.tsx    # Company name, description
-        ├── Provider.tsx   # Default model provider
-        ├── ProviderAccounts.tsx # API key account management
-        ├── Model.tsx      # Default model selection, thinking level
+        ├── Provider.tsx   # Provider API key management
         ├── Extensions.tsx # Plugin management
+        ├── Mcp.tsx        # MCP server management
         ├── Skills.tsx     # Built-in skill toggles
-        ├── Roles.tsx      # Role CRUD
         ├── Prompt.tsx     # Global platform prompt
         └── Appearance.tsx # Theme/background selection
 ```
@@ -168,8 +193,8 @@ web/src/
 | `agents` | AI agent profiles: name, role, description, system_prompt, model_config, avatar, is_active, is_default |
 | `users` | Human employees: username, password_hash, display_name, avatar, bio, is_admin |
 | `sessions` | Auth tokens linked to users |
-| `roles` | Named roles with prompt text |
-| `agent_roles` | Junction: agents ↔ roles (many-to-many) |
+| `roles` | Named roles with prompt text (schema exists but not currently used in system prompt) |
+| `agent_roles` | Junction: agents ↔ roles (many-to-many) (schema exists but not currently used) |
 
 ### Per-Agent Data
 
@@ -198,16 +223,20 @@ web/src/
 
 | Table | Purpose |
 |-------|---------|
-| `provider_accounts` | Multiple API key accounts per provider with cooldown timestamps |
+| `provider_accounts` | Legacy API key accounts per provider with cooldown timestamps (superseded by connection_profiles) |
+| `connection_profiles` | LLM connection profiles: provider type, base URL, API key, model ID, default flag |
+| `mcp_servers` | MCP (Model Context Protocol) server definitions |
+| `agent_mcp_servers` | Junction: agents ↔ MCP servers (many-to-many, with enabled flag) |
 | `plugins` | Plugin registry with configured flag |
 | `notifications` | System notifications (agent, schedule, error, dm types) |
 | `notification_reads` | Per-user read state for notifications |
+| `channel_sessions` | Persistent conversation sessions per (agent, channel_key) — see channel-sessions.md |
 
 ---
 
 ## Auth
 
-Token-based auth using cookie sessions + SQLite. Passwords are hashed with `bcrypt`.
+Token-based auth using cookie sessions + SQLite. Passwords are hashed with `scrypt` (random 16-byte salt, verified with `timingSafeEqual`).
 
 - Auth tokens stored in the `sessions` table
 - Cookie-based session tracking via `cookieParser`
@@ -219,13 +248,13 @@ No JWT, no OAuth. Designed for single-server local deployment.
 
 ## Plugin System
 
-Plugins implement `ToolDefinition` from the Pi SDK. They interact with external APIs and are installed at the platform level, then assigned per-agent via the agent's `model_config.tools` array.
+Plugins implement the `AgentOSPlugin` interface with `config`, `getTools(ctx)`, optional `setup()`, and optional `healthCheck()`. Built-in plugins are statically imported in `plugins/index.ts` (Brave Search, ElevenLabs, Gemini Image, YouTube, Remotion, Hacker News, Fetch Content). Plugins are configured via environment variables in `.env` and assigned per-agent via the agent's `model_config.tools` array.
 
 ---
 
 ## Agent System Prompt
 
-See [system-prompt.md](system-prompt.md) for the layered composition (identity → roles → tools → directory → memory/todos).
+See [system-prompt.md](system-prompt.md) for the layered composition (platform prompt → identity → tools → memory → todos).
 
 ## Agent Lifecycle
 

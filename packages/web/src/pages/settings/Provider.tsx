@@ -25,6 +25,7 @@ interface FormData {
   apiKey: string
   modelId: string
   isDefault: boolean
+  isVision: boolean
 }
 
 const emptyForm: FormData = {
@@ -34,6 +35,7 @@ const emptyForm: FormData = {
   apiKey: '',
   modelId: '',
   isDefault: false,
+  isVision: false,
 }
 
 export default function SettingsProvider() {
@@ -116,6 +118,7 @@ export default function SettingsProvider() {
       apiKey: '',
       modelId: profile.modelId,
       isDefault: profile.isDefault,
+      isVision: profile.isVision,
     })
     setModelSearch(profile.modelId)
     setShowKey(false)
@@ -146,6 +149,7 @@ export default function SettingsProvider() {
           baseUrl: form.baseUrl.trim(),
           modelId: form.modelId.trim(),
           isDefault: form.isDefault,
+          isVision: form.isVision,
         }
         if (form.apiKey.trim()) updateData.apiKey = form.apiKey.trim()
         await api.connectionProfiles.update(editingId, updateData as any)
@@ -157,6 +161,7 @@ export default function SettingsProvider() {
           apiKey: isLocalProvider ? '' : form.apiKey.trim(),
           modelId: form.modelId.trim(),
           isDefault: form.isDefault,
+          isVision: form.isVision,
         })
       }
       setShowForm(false)
@@ -371,6 +376,18 @@ export default function SettingsProvider() {
                 </div>
                 <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Set as default profile</span>
               </label>
+
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                  className={`w-10 h-5 rounded-full transition-colors relative ${form.isVision ? 'bg-accent' : 'bg-white/[0.07]'}`}
+                  onClick={() => setForm(f => ({ ...f, isVision: !f.isVision }))}
+                >
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.isVision ? 'translate-x-5' : 'translate-x-0.5'}`}
+                  />
+                </div>
+                <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Vision-capable model (supports images)</span>
+              </label>
             </div>
 
             {error && <p className="text-xs text-red-400">{error}</p>}
@@ -414,8 +431,13 @@ export default function SettingsProvider() {
                       Model: {profile.modelId}
                     </div>
                   )}
-                  <div className="text-[10px] mt-0.5" style={{ color: 'var(--subtle)' }}>
-                    Key: {profile.maskedKey}
+                  <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--subtle)' }}>
+                    <span>Key: {profile.maskedKey}</span>
+                    {profile.isVision && (
+                      <span className="text-[10px] bg-blue-400/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
+                        Vision
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">

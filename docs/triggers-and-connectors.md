@@ -14,7 +14,7 @@ Agents behave like digital employees — reachable from multiple surfaces (web U
 | **Invocation** | A single act of waking an agent from a trigger and running a prompt through the AI harness |
 | **Connector** | A long-running service that bridges an external platform (Slack, Telegram) to the trigger system |
 | **Platform Message** | A message received from or sent to an external platform, stored in the DB |
-| **Conversation Context** | The last N platform messages injected into the system prompt for a given conversation scope |
+| **Conversation Context** | The native conversation memory maintained by a persistent channel session for a given conversation surface |
 | **Trigger Registry** | The `agent_triggers` table — the single source of truth listing every invocation source for every agent |
 
 ---
@@ -37,16 +37,18 @@ Every trigger, regardless of source, produces the same output: an **invocation**
 
 Not every platform event triggers agent invocation. Events are classified:
 
-| Event | Triggers invocation? | Stored in DB? | Included in context window? |
+| Event | Triggers invocation? | Stored in DB? | Included in session context? |
 |---|---|---|---|
-| DM message | Yes | Yes | Yes |
-| @mention in channel | Yes | Yes | Yes |
-| @mention in thread | Yes | Yes | Yes (thread-scoped) |
-| Channel message (no mention) | No | Yes | Yes (available for future context) |
-| Thread reply where agent has not participated | No | Yes | Yes |
-| Thread reply where agent has previously participated | Configurable (`auto_follow_threads`) | Yes | Yes |
-| Quote-reply to agent message | Yes | Yes, with `reply_to_id` | Yes, with quoted content inline |
-| Reaction added/removed | No | Yes (`message_type = 'reaction'`) | Yes (configurable per integration) |
+| DM message | Yes | Yes | Yes (persistent DM session) |
+| @mention in channel | Yes | Yes | Yes (new thread session) |
+| @mention in thread | Yes | Yes | Yes (existing thread session) |
+| Channel message (no mention) | No | Yes | No (not in any thread session) |
+| Thread reply where agent has not participated | No | Yes | No (agent not in thread) |
+| Thread reply where agent has previously participated | No* | Yes | Yes (agent is in thread session) |
+| Reply to agent message (Telegram) | Yes | Yes | Yes (group session) |
+| Reaction added/removed | No | Yes (`message_type = 'reaction'`) | No |
+
+\* `auto_follow_threads` exists in the config schema but is not currently implemented in connector handlers. Agents only respond to explicit @mentions or replies to their own messages.
 
 ---
 
@@ -120,20 +122,17 @@ Returns:
 ```json
 {
   "system_prompt": "You are an AI agent working for Rascal Inc...",
-  "trigger_context_addendum": "[Platform Context]\nYou are responding to a Slack DM...",
-  "conversation_history": [
-    { "sender": "john", "sender_type": "user", "content": "Can you pull Q1 numbers?", "timestamp": "..." },
-    { "sender": "Fabiana", "sender_type": "agent", "content": "Here they are...", "timestamp": "..." }
-  ],
-  "history_window": 20,
-  "total_history_available": 47
+  "trigger_context_addendum": "[Trigger Context — Scheduler]\nYou are running a scheduled task...",
+  "trigger_prompt": "Generate the daily report...",
+  "conversation_history": [],
+  "history_window": 0
 }
 ```
 
 Notes per trigger type:
-- **scheduler**: `conversation_history` is always empty — schedulers receive no chat context
-- **internal_chat**: history pulled from `chat_messages`
-- **slack_\* / telegram_\***: history pulled from `platform_messages` scoped to `scope_id` (and `thread_id` if applicable)
+- **scheduler**: Shows the scheduler prompt text in `trigger_prompt`. `conversation_history` is always empty.
+- **internal_chat**: Includes last 20 messages from `chat_messages` in `conversation_history`.
+- **slack_\* / telegram_\***: Minimal preview — shows platform/scope info in `trigger_context_addendum`. Full conversation context is handled natively by the persistent channel session, not injected into the preview.
 
 ### 4.5 Trigger List Display
 
@@ -161,66 +160,69 @@ Clicking **preview** opens a modal with the full constructed prompt. Clicking **
 
 ### 5.1 Unified Invocation Pipeline
 
-All triggers feed into a single invocation function:
+Triggers follow one of two paths depending on the source:
 
+**Platform triggers** (Slack, Telegram, Web UI) → `chatWithChannel()`:
 ```
-invokeAgent(agentId, triggerPayload) →
-  1. Resolve agent config
-  2. Build system prompt  (base + trigger context addendum)
-  3. Build conversation history  (last N messages from DB, scoped to conversation)
-  4. Create fresh Pi SDK session
+chatWithChannel(agent, channelKey, platform, message, model, scopeType, scopeId) →
+  1. Look up active channel_session for (agent_id, channel_key)
+  2. Create new channel_session row + on-disk session directory if none exists
+  3. Build system prompt  (platform prompt + identity + tools + memory + todos)
+  4. Send message through persistent Pi SDK session (liveSessions map)
   5. Run prompt
-  6. Store response to DB
-  7. Deliver response via trigger's reply channel
+  6. Return response
+  7. Store outbound message to platform_messages
+  8. Deliver response via connector.sendMessage()
+```
+
+**Scheduler triggers** → `invokeAgent()`:
+```
+invokeAgent(agent, prompt, model, opts) →
+  1. Build system prompt  (platform prompt + identity + tools + memory + todos)
+  2. Append systemPromptAddendum if provided (not used for schedulers)
+  3. Wrap prompt with task delimiter
+  4. Create fresh isolated Pi SDK session
+  5. Run prompt
+  6. Return response
+  7. Clean up session (not persisted in liveSessions)
 ```
 
 ### 5.2 Session Strategy
 
 | Trigger | Session |
 |---|---|
-| Scheduler | Fresh session per run — no history needed |
-| InternalChat | Persistent session per agent (existing behavior) |
-| SlackDM | Fresh session per invocation, history rebuilt from DB |
-| SlackChannel | Fresh session per invocation, history rebuilt from DB |
-| TelegramDM | Fresh session per invocation, history rebuilt from DB |
-| TelegramGroup | Fresh session per invocation, history rebuilt from DB |
+| Scheduler | Fresh isolated session per run — no history needed |
+| InternalChat | Persistent channel session (`web:dm:default`) |
+| SlackDM | Persistent channel session per DM (`slack:dm:{channelId}`) |
+| SlackChannel | Persistent channel session per thread (`slack:channel:{channelId}:{threadTs}`) |
+| TelegramDM | Persistent channel session per DM (`telegram:dm:{chatId}`) |
+| TelegramGroup | Persistent channel session per group (`telegram:group:{chatId}`) |
 
-**Rationale:** All external triggers use the same stateless model as the scheduler. The DB is the source of truth for conversation history — no Pi SDK session state needs to survive across invocations or server restarts. This eliminates session persistence complexity entirely.
+**Rationale:** Platform triggers (Slack, Telegram) use the same persistent channel session model as the web UI. Each conversation surface gets its own `channel_sessions` row and on-disk SDK session directory. The agent retains full native conversation memory across messages — history is not injected as plain text. See [channel-sessions.md](channel-sessions.md) for details.
 
-### 5.3 Trigger Context Addendum
+### 5.3 Trigger Context Header
 
-Each trigger type appends a platform-specific block to the system prompt:
+For platform triggers (Slack, Telegram), the queue worker prepends a compact one-line header to the user message so the agent knows who sent it and can reference the message ID for reactions. The channel session itself maintains full conversation memory — no history injection is needed.
 
 ```
-[Trigger Context — Slack Channel Thread]
-You are responding to a message in Slack channel #marketing (C12345678), in a thread.
-The thread was started by: "Can you pull last week's sales numbers?"
-You were mentioned by John Smith (@john).
-Reply within this thread. Format your response using Slack markdown (*bold*, `code`, etc.).
+[Slack #marketing | From: John Smith | msg_id:C12345678:1743254400.123456]
+Can you pull last week's sales numbers?
 ```
 
 ```
-[Trigger Context — Slack DM]
-You are responding to a direct message on Slack.
-Sender: John Smith (@john) — Slack user ID: U12345678
-Format responses using Slack markdown: *bold*, _italic_, `code`, ```code block```.
-Keep responses focused and concise.
+[Telegram DM | From: John Smith | msg_id:123456789:42]
+Can you break that down by region?
 ```
 
-```
-[Trigger Context — Telegram Group]
-You are responding to a message in Telegram group "Marketing Team" (group ID: -1001234567890).
-You were mentioned by @john_smith.
-Format responses using plain text; Telegram group chats don't always render markdown well.
-```
+For scheduler triggers, the task prompt is wrapped with a task delimiter:
 
 ```
-[Trigger Context — Scheduler]
-You are running a scheduled task. No reply is needed — complete the task and use
-available tools (send_direct_message) if you need to communicate results.
+------------------------
+Now your current task is:
+[schedule prompt text]
 ```
 
-Internal chat has no addendum (existing behavior unchanged).
+Internal chat has no header (the web UI message is sent directly to the persistent `web:dm:default` channel session).
 
 ---
 
@@ -228,59 +230,45 @@ Internal chat has no addendum (existing behavior unchanged).
 
 ### 6.1 Principle
 
-**All messages — incoming and outgoing — on all platforms are stored in the DB.** When an agent is triggered, the last N messages in the relevant conversation scope are fetched and injected into the prompt as context.
+**All messages — incoming and outgoing — on all platforms are stored in the DB** in the `platform_messages` table. This serves as an audit log and enables cross-platform search.
 
-The Pi SDK session does not carry memory between invocations. The DB is the memory.
+For **platform triggers** (Slack, Telegram, Web UI), the agent uses **persistent channel sessions** (`channel_sessions` table). Each conversation surface has its own on-disk SDK session directory, giving the agent native conversation memory across messages. The `platform_messages` table is not used for context injection — the SDK session handles history natively.
+
+For **scheduler triggers**, there is no conversation history — each run uses a fresh isolated session.
 
 ### 6.2 Conversation Scope
 
-Scope determines which messages constitute "this conversation." The scope key is the DB query filter.
+For persistent channel sessions, each conversation surface is identified by a `channel_key`:
 
-| Platform | Situation | Scope Key | What "last N" means |
+| Platform | Situation | `channel_key` | Session directory |
 |---|---|---|---|
-| SlackDM | 1:1 with user | `(agent_id, platform='slack', scope_type='dm', scope_id=slack_user_id)` | Last N messages in this DM |
-| SlackChannel | @mention, not in a thread | Agent creates a new thread; scope is the new `thread_id` | Last N messages in that thread |
-| SlackChannel | @mention inside an existing thread | `thread_id = slack_thread_ts` | Last N messages in this thread |
-| TelegramDM | 1:1 with user | `(agent_id, platform='telegram', scope_type='dm', scope_id=telegram_chat_id)` | Last N messages in this chat |
-| TelegramGroup | @mention in group | `(agent_id, platform='telegram', scope_type='group', scope_id=telegram_group_id)` | Last N messages in the group |
+| Web UI | Direct chat | `web:dm:default` | One session for all web chat |
+| SlackDM | 1:1 with user | `slack:dm:{channelId}` | One session per DM |
+| SlackChannel | @mention (creates thread) | `slack:channel:{channelId}:{threadTs}` | One session per thread |
+| TelegramDM | 1:1 with user | `telegram:dm:{chatId}` | One session per DM |
+| TelegramGroup | @mention in group | `telegram:group:{chatId}` | One session per group |
 
-**Threading rule for Slack channels:** The agent always replies in a thread. If the @mention is not already in a thread, the agent's reply creates one. All subsequent conversation stays in that thread. This keeps channels clean and gives each conversation a focused scope.
+**Threading rule for Slack channels:** The agent always replies in a thread. If the @mention is not already in a thread, the agent's reply creates one (using the message `ts` as `thread_ts`). All subsequent conversation stays in that thread. This keeps channels clean and gives each conversation a focused scope.
 
-When the @mention is inside a thread, the agent also includes the **thread root message** as the first item in context, since it anchors the topic of the thread.
+### 6.3 Platform Messages as Audit Log
 
-### 6.3 History Injection Format
+The `platform_messages` table stores every inbound and outbound message for audit, search, and the trigger preview endpoint. It is **not** injected into the agent's context window — the persistent channel session handles that natively.
 
-Conversation history is injected into the system prompt as a structured block:
+Example query results:
 
 ```
-[Conversation History — last 20 messages, Slack #marketing thread]
-[2026-03-22 09:00] john (user): [thread root] Can you pull last week's sales numbers?
-[2026-03-22 09:01] john (user): @Fabiana — starting this thread for the Q1 review
+[2026-03-22 09:00] john (user): Can you pull last week's sales numbers?
 [2026-03-22 09:02] Fabiana (agent): Here are the numbers: ...
 [2026-03-22 09:05] john (user): Can you break that down by region?
 ```
 
-For quote-replies, the referenced message is shown inline:
-
-```
-[2026-03-22 09:10] john (user): [quoting Fabiana: "The Q1 total is $1.2M"] Can you break that down by region?
-```
-
-This is then followed by the current incoming message as the actual prompt.
-
 ### 6.4 Configurable Window
 
-`N` (number of messages) is configurable per agent integration, defaulting to 20. For high-traffic channels, a smaller window may be appropriate.
+The `history_window` config field exists in the connector config schema but is currently not used for context injection (since persistent channel sessions manage their own history). It may be used in future for limiting the `search_conversation_history` tool results.
 
 ### 6.5 Reactions in Context
 
-Reactions are stored as `message_type = 'reaction'` and can optionally appear in the history block:
-
-```
-[2026-03-22 09:12] john (user): [reacted 👍 to Fabiana's message: "The Q1 total is $1.2M"]
-```
-
-This gives the agent social feedback about prior responses. Inclusion is configurable via `include_reactions_in_history` per integration (default: `false`).
+Reactions are stored as `message_type = 'reaction'` in `platform_messages`. The `include_reactions_in_history` config field exists in the schema but reactions are not currently surfaced to the agent via the persistent session. They are available via the `search_conversation_history` tool.
 
 ### 6.6 Internal Tool: `get_conversation_history`
 
@@ -458,7 +446,8 @@ A single queue worker polls `invocation_queue` every few seconds:
    ORDER BY created_at ASC (FIFO per agent)
 2. Group by agent_id, take one per agent (no parallel runs per agent)
 3. Mark row as 'processing'
-4. Run invokeAgent(agentId, payload)
+4. If platform trigger: run chatWithChannel() with persistent session + message header
+   If scheduler trigger: run invokeAgent() with fresh isolated session
 5. On success: mark 'done', store response, deliver via reply channel
 6. On 429 from AI provider: mark back to 'pending', set retry_after = now() + cooldown
 7. On hard error (>3 retries): mark 'failed', emit error event
@@ -502,16 +491,15 @@ Telegraf's built-in long polling is used. The bot repeatedly calls `getUpdates` 
 
 ```
 packages/server/src/connectors/
-├── types.ts              — shared interfaces (InboundMessage, TriggerContext, ConnectorConfig)
+├── types.ts              — shared interfaces (Connector, InboundMessage, SlackChannelConfig, TelegramChannelConfig)
 ├── loader.ts             — starts/stops connectors based on DB config
-├── queue-worker.ts       — processes invocation_queue
 ├── slack/
 │   ├── index.ts          — SlackConnector class (Socket Mode via Bolt)
-│   ├── context.ts        — builds TriggerContext for Slack events
+│   ├── context.ts        — SlackTriggerMeta type
 │   └── format.ts         — formats agent response as Slack markdown
 └── telegram/
     ├── index.ts          — TelegramConnector class (long polling via Telegraf)
-    ├── context.ts        — builds TriggerContext for Telegram events
+    ├── context.ts        — TelegramTriggerMeta type
     └── format.ts         — formats agent response for Telegram
 ```
 
@@ -555,18 +543,17 @@ Connector.handleEvent(event)
   │   ├─ Quote-reply to agent message: always
   │   ├─ Thread reply (agent participated, auto_follow_threads=true): yes
   │   └─ Reaction: never
-  ├─ If responding: enqueue to invocation_queue with full payload
+  ├─ If responding: enqueue to invocation_queue with trigger context + prompt
   └─ Acknowledge to platform immediately (return control to polling loop)
   ↓
 Queue worker picks up invocation
   ↓
-invokeAgent(agentId, payload)
-  ├─ Determine conversation scope (scope_id + thread_id)
-  ├─ Fetch thread root message if in-thread (prepend to context)
-  ├─ Fetch last N messages from platform_messages for this scope
-  ├─ Resolve any reply_to_msg_id → inline quoted content in history
-  ├─ Build system prompt + trigger context addendum
-  ├─ Run fresh Pi SDK session
+chatWithChannel(agent, channelKey, platform, message, model, scopeType, scopeId)
+  ├─ Look up active channel_session for (agent_id, channel_key)
+  ├─ Create new channel_session row + on-disk session directory if none exists
+  ├─ Build system prompt (includes global platform prompt + identity + tools + memory)
+  ├─ Prepend compact message header with sender info and msg_id
+  ├─ Send message through persistent Pi SDK session (liveSessions map)
   ├─ Store response to platform_messages (outbound)
   └─ Call connector.sendMessage(scope_id, thread_id, response)
 ```
@@ -608,16 +595,20 @@ GET    /api/agents/:id/triggers/:tid/preview-prompt  — preview constructed pro
 GET    /api/agents/:id/triggers/:tid/invocations     — list past invocations for trigger
        ?status=failed&limit=20
 
-# Integrations (manages connectors + creates trigger rows)
-GET    /api/agents/:id/integrations          — list integrations for agent
-POST   /api/agents/:id/integrations          — create integration (starts connector)
-GET    /api/agents/:id/integrations/:iid     — get integration (tokens masked in response)
-PATCH  /api/agents/:id/integrations/:iid     — update config or enable/disable
-DELETE /api/agents/:id/integrations/:iid     — delete integration (stops connector)
+# Channels (manages connectors + creates trigger rows)
+GET    /api/agents/:id/channels              — list channels for agent
+POST   /api/agents/:id/channels              — create channel (starts connector)
+GET    /api/agents/:id/channels/:cid         — get channel (tokens masked in response)
+PATCH  /api/agents/:id/channels/:cid         — update config or enable/disable
+DELETE /api/agents/:id/channels/:cid         — delete channel (stops connector)
+POST   /api/agents/:id/channels/:cid/restart — restart connector
 
 # Platform message log
 GET    /api/agents/:id/platform-messages     — query stored platform messages
        ?platform=slack&scope_id=C123&thread_id=xxx&limit=50
+
+# Invocation queue summary
+GET    /api/agents/:id/invocations/summary   — queue status counts for agent
 ```
 
 No webhook endpoints. Slack uses Socket Mode (outbound WebSocket); Telegram uses long polling.

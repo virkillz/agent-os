@@ -17,6 +17,7 @@ function toPublic(row: ConnectionProfileRow) {
     maskedKey: maskKey(row.api_key),
     modelId: row.model_id,
     isDefault: row.is_default === 1,
+    isVision: row.is_vision === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -79,13 +80,14 @@ export function createConnectionProfilesRouter(): Router {
   })
 
   router.post('/', requireAuth, (req, res) => {
-    const { name, providerType, baseUrl, apiKey, modelId, isDefault } = req.body as {
+    const { name, providerType, baseUrl, apiKey, modelId, isDefault, isVision } = req.body as {
       name?: string
       providerType?: string
       baseUrl?: string
       apiKey?: string
       modelId?: string
       isDefault?: boolean
+      isVision?: boolean
     }
     if (!name?.trim() || !providerType?.trim() || !baseUrl?.trim()) {
       res.status(400).json({ error: 'name, providerType, and baseUrl are required' })
@@ -101,9 +103,9 @@ export function createConnectionProfilesRouter(): Router {
       db.prepare("UPDATE connection_profiles SET is_default = 0, updated_at = datetime('now')").run()
     }
     db.prepare(
-      `INSERT INTO connection_profiles (id, name, provider_type, base_url, api_key, model_id, is_default)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, name.trim(), providerType.trim(), baseUrl.trim(), apiKey?.trim() ?? '', modelId?.trim() ?? '', isDefault ? 1 : 0)
+      `INSERT INTO connection_profiles (id, name, provider_type, base_url, api_key, model_id, is_default, is_vision)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, name.trim(), providerType.trim(), baseUrl.trim(), apiKey?.trim() ?? '', modelId?.trim() ?? '', isDefault ? 1 : 0, isVision ? 1 : 0)
     const row = db.prepare('SELECT * FROM connection_profiles WHERE id = ?').get(id) as unknown as ConnectionProfileRow
     res.status(201).json(toPublic(row))
   })
@@ -114,13 +116,14 @@ export function createConnectionProfilesRouter(): Router {
     const row = db.prepare('SELECT * FROM connection_profiles WHERE id = ?').get(id) as unknown as ConnectionProfileRow | undefined
     if (!row) { res.status(404).json({ error: 'Not found' }); return }
 
-    const { name, providerType, baseUrl, apiKey, modelId, isDefault } = req.body as {
+    const { name, providerType, baseUrl, apiKey, modelId, isDefault, isVision } = req.body as {
       name?: string
       providerType?: string
       baseUrl?: string
       apiKey?: string
       modelId?: string
       isDefault?: boolean
+      isVision?: boolean
     }
     const newName = name?.trim() ?? row.name
     const newProviderType = providerType?.trim() ?? row.provider_type
@@ -128,6 +131,7 @@ export function createConnectionProfilesRouter(): Router {
     const newKey = apiKey !== undefined ? apiKey.trim() : row.api_key
     const newModelId = modelId !== undefined ? modelId.trim() : row.model_id
     const newDefault = isDefault !== undefined ? (isDefault ? 1 : 0) : row.is_default
+    const newVision = isVision !== undefined ? (isVision ? 1 : 0) : row.is_vision
 
     if (newDefault) {
       db.prepare("UPDATE connection_profiles SET is_default = 0, updated_at = datetime('now')").run()
@@ -135,9 +139,9 @@ export function createConnectionProfilesRouter(): Router {
 
     db.prepare(
       `UPDATE connection_profiles
-       SET name = ?, provider_type = ?, base_url = ?, api_key = ?, model_id = ?, is_default = ?, updated_at = datetime('now')
+       SET name = ?, provider_type = ?, base_url = ?, api_key = ?, model_id = ?, is_default = ?, is_vision = ?, updated_at = datetime('now')
        WHERE id = ?`
-    ).run(newName, newProviderType, newBaseUrl, newKey, newModelId, newDefault, id)
+    ).run(newName, newProviderType, newBaseUrl, newKey, newModelId, newDefault, newVision, id)
 
     const updated = db.prepare('SELECT * FROM connection_profiles WHERE id = ?').get(id) as unknown as ConnectionProfileRow
     res.json(toPublic(updated))

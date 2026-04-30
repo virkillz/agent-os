@@ -1,4 +1,4 @@
-import { getModel } from '@mariozechner/pi-ai'
+import { getModel, type ImageContent } from '@mariozechner/pi-ai'
 import {
   createAgentSession,
   createCodingTools,
@@ -25,6 +25,7 @@ import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
 import { pluginLoader } from './plugin-loader.js'
 import { getMcpToolsForAgent } from './mcp-client.js'
+import type { Attachment } from './connectors/types.js'
 
 let debugMode = false
 
@@ -166,6 +167,52 @@ function resolveModelConfig(modelConfigJson: string, defaultConfig: ModelConfig)
   } catch {
     return defaultConfig
   }
+}
+
+/**
+ * Check if the current model configuration supports vision (image input).
+ * Checks the connection profile's is_vision flag or the model registry input capabilities.
+ */
+function modelSupportsVision(config: ModelConfig): boolean {
+  // Check connection profile first
+  if (config.connectionProfileId) {
+    const profile = getDb()
+      .prepare('SELECT is_vision FROM connection_profiles WHERE id = ?')
+      .get(config.connectionProfileId) as { is_vision: number } | undefined
+    if (profile?.is_vision === 1) return true
+  }
+
+  // Check Pi SDK Model registry input capabilities
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const model = getModel(config.provider as any, config.modelId as any)
+    if (model?.input?.includes('image')) return true
+  } catch {
+    // Model not in registry, fall through
+  }
+
+  return false
+}
+
+/**
+ * Find a vision-capable fallback model from connection profiles.
+ * Returns null if none found.
+ */
+function findVisionFallbackModel(): ModelConfig | null {
+  const db = getDb()
+  const profile = db.prepare(
+    'SELECT id, provider_type, model_id FROM connection_profiles WHERE is_vision = 1 ORDER BY is_default DESC, created_at ASC LIMIT 1'
+  ).get() as { id: string; provider_type: string; model_id: string } | undefined
+
+  if (profile) {
+    return {
+      provider: profile.provider_type,
+      modelId: profile.model_id,
+      connectionProfileId: profile.id,
+    }
+  }
+
+  return null
 }
 
 async function createLiveSession(
@@ -400,6 +447,7 @@ export async function chatWithChannel(
   defaultModel: ModelConfig,
   scopeType?: string,
   scopeId?: string,
+  attachments?: Attachment[],
 ): Promise<string> {
   let channelSession = getActiveChannelSession(agent.id, channelKey)
   if (!channelSession) {
@@ -407,9 +455,25 @@ export async function chatWithChannel(
   }
 
   const liveKey = `${agent.id}:${channelSession.id}`
+  const hasImages = attachments && attachments.length > 0
+
+  // Determine effective model config
+  let effectiveModel = defaultModel
+  if (hasImages) {
+    const agentConfig = resolveModelConfig(agent.model_config, defaultModel)
+    if (!modelSupportsVision(agentConfig)) {
+      const fallback = findVisionFallbackModel()
+      if (fallback) {
+        effectiveModel = fallback
+        if (debugMode) {
+          dbg(agent.name, chalk.yellow('→ vision fallback:'), `${fallback.provider}/${fallback.modelId}`)
+        }
+      }
+    }
+  }
 
   if (!liveSessions.has(liveKey)) {
-    const live = await createLiveSession(agent, defaultModel, undefined, channelSession.id, false)
+    const live = await createLiveSession(agent, effectiveModel, undefined, channelSession.id, false)
     liveSessions.set(liveKey, live)
   }
 
@@ -420,12 +484,18 @@ export async function chatWithChannel(
   if (debugMode) {
     dbg(agent.name, chalk.green('→ channel:'), channelKey)
     dbg(agent.name, chalk.green('→ sending:'), message.length > 500 ? message.slice(0, 500) + '…' : message)
+    if (hasImages) dbg(agent.name, chalk.green('→ images:'), attachments.length)
   }
+
+  // Convert attachments to Pi SDK ImageContent format
+  const images: ImageContent[] | undefined = hasImages
+    ? attachments.map((a) => ({ type: 'image', data: a.data, mimeType: a.mimeType }))
+    : undefined
 
   return new Promise((resolve, reject) => {
     pending.set(liveKey, { chunks: [], resolve })
 
-    live.session.prompt(message, { streamingBehavior: 'followUp' })
+    live.session.prompt(message, { streamingBehavior: 'followUp', images })
       .then(() => live.session.agent.waitForIdle())
       .then(() => {
         const p = pending.get(liveKey)
@@ -488,6 +558,8 @@ export interface InvokeAgentOpts {
    * Platform (Slack/Telegram) invocations should set this to true.
    */
   rawPrompt?: boolean
+  /** Image attachments to include with the prompt */
+  attachments?: Attachment[]
 }
 
 /**
@@ -522,12 +594,36 @@ export async function runScheduledTask(
     ? taskPrompt
     : `------------------------\nNow your current task is:\n${taskPrompt}`
 
-  const live = await createLiveSession(agent, defaultModel, systemPrompt)
+  // Determine effective model config (with vision fallback if images attached)
+  let effectiveModel = defaultModel
+  const attachments = opts?.attachments
+  const hasImages = attachments && attachments.length > 0
+
+  if (hasImages) {
+    const agentConfig = resolveModelConfig(agent.model_config, defaultModel)
+    if (!modelSupportsVision(agentConfig)) {
+      const fallback = findVisionFallbackModel()
+      if (fallback) {
+        effectiveModel = fallback
+        if (debugMode) {
+          dbg(agent.name, chalk.yellow('→ vision fallback:'), `${fallback.provider}/${fallback.modelId}`)
+        }
+      }
+    }
+  }
+
+  const live = await createLiveSession(agent, effectiveModel, systemPrompt)
 
   if (debugMode) {
     dbg(agent.name, chalk.bold('── SCHEDULED TASK ──'))
     dbg(agent.name, chalk.dim('task:\n') + userMessage)
+    if (hasImages) dbg(agent.name, chalk.green('→ images:'), attachments.length)
   }
+
+  // Convert attachments to Pi SDK ImageContent format
+  const images: ImageContent[] | undefined = hasImages
+    ? attachments.map((a) => ({ type: 'image', data: a.data, mimeType: a.mimeType }))
+    : undefined
 
   return new Promise((resolve, reject) => {
     const chunks: string[] = []
@@ -542,7 +638,7 @@ export async function runScheduledTask(
 
     eventBus.emit({ type: 'agent:thinking', agentId: agent.id })
 
-    live.session.prompt(userMessage, { streamingBehavior: 'followUp' })
+    live.session.prompt(userMessage, { streamingBehavior: 'followUp', images })
       .then(() => live.session.agent.waitForIdle())
       .then(() => {
         if (typeof unsubscribe === 'function') unsubscribe()

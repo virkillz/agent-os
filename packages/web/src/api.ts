@@ -252,9 +252,9 @@ export const api = {
     presets: () => req<ProviderPreset[]>('GET', '/connection-profiles/presets'),
     fetchModels: (baseUrl: string, apiKey?: string) =>
       req<string[]>('POST', '/connection-profiles/fetch-models', { baseUrl, apiKey }),
-    create: (data: { name: string; providerType: string; baseUrl: string; apiKey?: string; modelId?: string; isDefault?: boolean }) =>
+    create: (data: { name: string; providerType: string; baseUrl: string; apiKey?: string; modelId?: string; isDefault?: boolean; isVision?: boolean }) =>
       req<ConnectionProfile>('POST', '/connection-profiles', data),
-    update: (id: string, data: { name?: string; providerType?: string; baseUrl?: string; apiKey?: string; modelId?: string; isDefault?: boolean }) =>
+    update: (id: string, data: { name?: string; providerType?: string; baseUrl?: string; apiKey?: string; modelId?: string; isDefault?: boolean; isVision?: boolean }) =>
       req<ConnectionProfile>('PUT', `/connection-profiles/${id}`, data),
     setDefault: (id: string) => req<{ ok: boolean }>('PUT', `/connection-profiles/${id}/default`),
     delete: (id: string) => req<{ ok: boolean }>('DELETE', `/connection-profiles/${id}`),
@@ -371,6 +371,7 @@ export interface ConnectionProfile {
   maskedKey: string
   modelId: string
   isDefault: boolean
+  isVision: boolean
   createdAt: string
   updatedAt: string
 }

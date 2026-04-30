@@ -201,6 +201,7 @@ function runMigrations(db: DB): void {
       api_key       TEXT NOT NULL,
       model_id      TEXT NOT NULL DEFAULT '',
       is_default    INTEGER NOT NULL DEFAULT 0,
+      is_vision     INTEGER NOT NULL DEFAULT 0,
       created_at    TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -378,6 +379,8 @@ function runMigrations(db: DB): void {
   addColumnIfNotExists(db, 'users', 'bio', "TEXT NOT NULL DEFAULT ''")
   addColumnIfNotExists(db, 'agents', 'account_id', 'TEXT')
   addColumnIfNotExists(db, 'agents', 'connection_profile_id', 'TEXT')
+  addColumnIfNotExists(db, 'connection_profiles', 'is_vision', 'INTEGER NOT NULL DEFAULT 0')
+  addColumnIfNotExists(db, 'platform_messages', 'attachments', "TEXT NOT NULL DEFAULT '[]'")
 }
 
 function seedInitialData(db: DB): void {
@@ -490,6 +493,7 @@ export interface ConnectionProfileRow {
   api_key: string
   model_id: string
   is_default: number
+  is_vision: number
   created_at: string
   updated_at: string
 }

@@ -6,9 +6,10 @@ import chalk from 'chalk'
 import { getDb } from '../../db.js'
 import { enqueueInvocation } from '../../queue-worker.js'
 import { endAndClearChannelSession } from '../../agent-runner.js'
-import type { Connector, SlackChannelConfig } from '../types.js'
+import type { Connector, SlackChannelConfig, Attachment } from '../types.js'
 import { toSlackMarkdown } from './format.js'
 import type { SlackTriggerMeta } from './context.js'
+import { downloadAndProcessImage } from '../image-utils.js'
 
 export class SlackConnector implements Connector {
   readonly platform = 'slack' as const
@@ -105,6 +106,11 @@ export class SlackConnector implements Connector {
     user: string
     text?: string
     ts: string
+    files?: Array<{
+      mimetype: string
+      url_private: string
+      name: string
+    }>
   }): Promise<void> {
     if (this.config.dm_enabled === false) return
 
@@ -123,12 +129,20 @@ export class SlackConnector implements Connector {
     }
 
     const senderName = await this.resolveUserName(senderId)
+    const { attachments, note } = await this.processFiles(message.files)
+
+    // Build prompt with file notes
+    let prompt = text
+    if (note) {
+      prompt = prompt ? `${prompt}\n\n${note}` : note
+    }
 
     // Deduplicate + store inbound
     if (!this.storeInbound({
       scopeType: 'dm', scopeId: channelId, threadId: null,
       externalMsgId, senderId, senderName, content: text,
       raw: JSON.stringify(message),
+      attachments,
     })) return  // already processed
 
     // Auto-register trigger row
@@ -149,8 +163,9 @@ export class SlackConnector implements Connector {
       agentId: this.agentId,
       triggerId,
       triggerType: 'slack_dm',
-      prompt: text,
+      prompt,
       triggerContext: ctx,
+      attachments,
     })
   }
 
@@ -160,6 +175,11 @@ export class SlackConnector implements Connector {
     text: string
     ts: string
     thread_ts?: string
+    files?: Array<{
+      mimetype: string
+      url_private: string
+      name: string
+    }>
   }): Promise<void> {
     const { channel: channelId, user: senderId, text, ts, thread_ts } = event
     // If already in a thread use its thread_ts; otherwise reply to this message (creating a new thread)
@@ -174,11 +194,20 @@ export class SlackConnector implements Connector {
     // Strip the bot @mention from the content so the agent sees clean text
     const cleanContent = text.replace(/<@[A-Z0-9]+>/g, '').trim()
 
+    const { attachments, note } = await this.processFiles(event.files)
+
+    // Build prompt with file notes
+    let prompt = cleanContent
+    if (note) {
+      prompt = prompt ? `${prompt}\n\n${note}` : note
+    }
+
     // Deduplicate + store inbound
     if (!this.storeInbound({
       scopeType: 'channel', scopeId: channelId, threadId,
       externalMsgId, senderId, senderName, content: cleanContent,
       raw: JSON.stringify(event),
+      attachments,
     })) return  // already processed
 
     // Auto-register trigger row
@@ -201,9 +230,51 @@ export class SlackConnector implements Connector {
       agentId: this.agentId,
       triggerId,
       triggerType: 'slack_channel',
-      prompt: cleanContent,
+      prompt,
       triggerContext: ctx,
+      attachments,
     })
+  }
+
+  // ── File processing ────────────────────────────────────────────────────────
+
+  /**
+   * Process Slack file attachments. Downloads images and returns notes about unsupported files.
+   */
+  private async processFiles(
+    files?: Array<{ mimetype: string; url_private: string; name: string }>,
+  ): Promise<{ attachments: Attachment[]; note?: string }> {
+    if (!files || files.length === 0) return { attachments: [] }
+
+    const attachments: Attachment[] = []
+    const unsupportedFiles: string[] = []
+    let imageCount = 0
+
+    for (const file of files) {
+      if (file.mimetype.startsWith('image/')) {
+        imageCount++
+        if (imageCount > 1) continue // Only process the first image
+
+        const image = await downloadAndProcessImage(file.url_private, {
+          Authorization: `Bearer ${this.config.bot_token}`,
+        })
+        if (image) {
+          attachments.push(image)
+        }
+      } else {
+        unsupportedFiles.push(file.name)
+      }
+    }
+
+    const notes: string[] = []
+    if (imageCount > 1) {
+      notes.push(`(Note: ${imageCount} images were attached, but I can only see one at a time.)`)
+    }
+    if (unsupportedFiles.length > 0) {
+      notes.push(`(Note: The following files are not supported: ${unsupportedFiles.join(', ')})`)
+    }
+
+    return { attachments, note: notes.length > 0 ? notes.join('\n') : undefined }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -221,18 +292,20 @@ export class SlackConnector implements Connector {
     senderName: string
     content: string
     raw: string
+    attachments?: Attachment[]
   }): boolean {
     try {
       getDb().prepare(`
         INSERT INTO platform_messages
           (agent_id, platform, message_type, direction, scope_type, scope_id, thread_id,
-           external_msg_id, sender_id, sender_name, sender_type, content, raw_payload)
-        VALUES (?, 'slack', 'message', 'inbound', ?, ?, ?, ?, ?, ?, 'user', ?, ?)
+           external_msg_id, sender_id, sender_name, sender_type, content, raw_payload, attachments)
+        VALUES (?, 'slack', 'message', 'inbound', ?, ?, ?, ?, ?, ?, 'user', ?, ?, ?)
       `).run(
         this.agentId,
         opts.scopeType, opts.scopeId, opts.threadId,
         opts.externalMsgId, opts.senderId, opts.senderName,
         opts.content, opts.raw,
+        JSON.stringify(opts.attachments ?? []),
       )
       return true
     } catch (err: unknown) {

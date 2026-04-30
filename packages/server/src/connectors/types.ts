@@ -39,6 +39,13 @@ export interface TriggerContext {
   senderId: string
 }
 
+/** Attachment sent with a platform message */
+export interface Attachment {
+  type: 'image'
+  mimeType: string
+  data: string // base64-encoded
+}
+
 /** Config shape returned from agent_channels.config for Slack */
 export interface SlackChannelConfig {
   app_token: string

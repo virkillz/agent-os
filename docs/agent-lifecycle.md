@@ -63,8 +63,9 @@ External messages arrive via connectors — long-running services that bridge Sl
   → Determine if agent should respond (DM: always, @mention: always, etc.)
   → If responding: enqueueInvocation() with trigger context + conversation scope
   → Queue worker picks up invocation
-  → invokeAgent() builds system prompt + platform context addendum
-  → Fresh isolated Pi SDK session runs the prompt
+  → chatWithChannel() looks up/creates persistent channel session
+  → Prepends compact message header with sender info
+  → Persistent Pi SDK session runs the prompt (full conversation memory)
   → Response stored to platform_messages (outbound)
   → Connector delivers reply via platform API (sendMessage)
 ```
@@ -97,17 +98,21 @@ There are two session strategies:
 
 | Path | Session | Function |
 |------|---------|----------|
-| Direct chat | **Persistent** — one `LiveSession` per agent in `liveSessions` map, retains context across messages | `chatWithAgent()` |
-| Scheduler / Slack / Telegram | **Fresh isolated** — new session per invocation, never stored in `liveSessions` | `invokeAgent()` → `runScheduledTask()` |
+| Direct chat | **Persistent channel session** — `web:dm:default` channel key, retains context across messages | `chatWithAgent()` → `chatWithChannel()` |
+| Slack / Telegram | **Persistent channel session** — per-conversation surface (DM, thread, group), retains native context | `chatWithChannel()` |
+| Scheduler | **Fresh isolated** — new session per invocation, never stored in `liveSessions` | `invokeAgent()` → `runScheduledTask()` |
 
-Both paths converge on `buildSystemPrompt()` in `agent-runner.ts` to assemble the system prompt from the layered composition (see [system-prompt.md](system-prompt.md)).
+All paths converge on `buildSystemPrompt()` in `agent-runner.ts` to assemble the system prompt from the layered composition (see [system-prompt.md](system-prompt.md)).
 
-For platform triggers, the queue worker appends a **system prompt addendum** containing conversation history and trigger context before calling `invokeAgent()`.
+For platform triggers (Slack, Telegram), the queue worker prepends a **compact message header** with sender info and message ID to the user message, then routes through `chatWithChannel()` so the agent has full persistent conversation memory.
+
+For scheduler triggers, the queue worker appends the task prompt with a `------------------------\nNow your current task is:` wrapper to a fresh isolated session.
 
 - **Session creation**: `createLiveSession()` in `agent-runner.ts`
-- **Session reset**: `clearSession()` evicts from `liveSessions` — happens on error or explicit `DELETE /api/agents/:id/chat`
+- **Session reset**: `clearSession()` evicts all live sessions for an agent from `liveSessions` — happens on error, agent update, or explicit `DELETE /api/agents/:id/chat`
+- **Channel session reset**: `endAndClearChannelSession()` ends a specific `channel_sessions` row and evicts its live session — used by `/clear` or `/start` commands
 
-The system prompt is assembled **once at session creation**. For persistent sessions, changes to memory, todos, or roles after creation won't reflect until the session is reset.
+The system prompt is assembled **once at session creation**. For persistent sessions, changes to memory, todos, or the platform prompt after creation won't reflect until the session is reset.
 
 ---
 
@@ -127,7 +132,7 @@ An inactive agent's persistent session remains in memory but is not invoked. Tog
 
 | Trigger | Who initiates | Async? | Session | Entry point |
 |---------|---------------|--------|---------|-------------|
-| Direct chat | Human via UI | No (awaits) | Persistent | `POST /api/agents/:id/chat` → `chatWithAgent()` |
-| Scheduler | Clock (60s poll) | Yes (queued) | Fresh | `scheduler.ts` → `invocation_queue` → `invokeAgent()` |
-| Slack DM / @mention | External user | Yes (queued) | Fresh | Slack connector → `invocation_queue` → `invokeAgent()` |
-| Telegram DM / @mention | External user | Yes (queued) | Fresh | Telegram connector → `invocation_queue` → `invokeAgent()` |
+| Direct chat | Human via UI | No (awaits) | Persistent channel (`web:dm:default`) | `POST /api/agents/:id/chat` → `chatWithAgent()` |
+| Scheduler | Clock (60s poll) | Yes (queued) | Fresh isolated | `scheduler.ts` → `invocation_queue` → `invokeAgent()` |
+| Slack DM / @mention | External user | Yes (queued) | Persistent channel (per DM/thread) | Slack connector → `invocation_queue` → `chatWithChannel()` |
+| Telegram DM / @mention | External user | Yes (queued) | Persistent channel (per DM/group) | Telegram connector → `invocation_queue` → `chatWithChannel()` |

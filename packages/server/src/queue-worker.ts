@@ -5,6 +5,7 @@ import { eventBus } from './event-bus.js'
 import { connectorLoader } from './connectors/loader.js'
 import { type SlackTriggerMeta } from './connectors/slack/context.js'
 import { type TelegramTriggerMeta } from './connectors/telegram/context.js'
+import type { Attachment } from './connectors/types.js'
 
 // ── Platform trigger context ───────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
     return
   }
 
-  let payload: { prompt: string; triggerContext?: PlatformTriggerContext }
+  let payload: { prompt: string; triggerContext?: PlatformTriggerContext; attachments?: Attachment[] }
   try {
     payload = JSON.parse(row.payload)
   } catch {
@@ -85,6 +86,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
   }
 
   const ctx = payload.triggerContext
+  const attachments = payload.attachments
 
   try {
     let response: string
@@ -95,10 +97,10 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
       const channelKey = buildChannelKey(ctx)
       const header = buildMessageHeader(ctx)
       const message = `${header}\n${payload.prompt}`
-      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId)
+      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId, attachments)
     } else {
       // Scheduled / other non-platform trigger: isolated fresh session (existing behaviour)
-      response = await invokeAgent(agent, payload.prompt, getFallbackModel())
+      response = await invokeAgent(agent, payload.prompt, getFallbackModel(), { attachments })
     }
 
     // Store outbound platform message and deliver via connector
@@ -168,11 +170,13 @@ export function enqueueInvocation(opts: {
   triggerType: string
   prompt: string
   triggerContext?: PlatformTriggerContext
+  attachments?: Attachment[]
 }): number {
   const db = getDb()
   const payload = JSON.stringify({
     prompt: opts.prompt,
     ...(opts.triggerContext ? { triggerContext: opts.triggerContext } : {}),
+    ...(opts.attachments ? { attachments: opts.attachments } : {}),
   })
   const result = db.prepare(
     'INSERT INTO invocation_queue (agent_id, trigger_id, trigger_type, payload) VALUES (?, ?, ?, ?)'

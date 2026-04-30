@@ -4,9 +4,10 @@ import chalk from 'chalk'
 import { getDb } from '../../db.js'
 import { enqueueInvocation } from '../../queue-worker.js'
 import { endAndClearChannelSession } from '../../agent-runner.js'
-import type { Connector, TelegramChannelConfig } from '../types.js'
+import type { Connector, TelegramChannelConfig, Attachment } from '../types.js'
 import { toTelegramText } from './format.js'
 import type { TelegramTriggerMeta } from './context.js'
+import { downloadAndProcessImage } from '../image-utils.js'
 
 export class TelegramConnector implements Connector {
   readonly platform = 'telegram' as const
@@ -103,7 +104,14 @@ export class TelegramConnector implements Connector {
 
   private async handleMessage(ctx: any): Promise<void> {
     const msg = ctx.message
-    if (!msg?.text || !msg.from) return
+    if (!msg?.from) return
+
+    // Handle messages with photos even if no text
+    const hasPhoto = msg.photo && msg.photo.length > 0
+    const hasDocument = msg.document && msg.document.mime_type?.startsWith('image/')
+    const hasText = msg.text && msg.text.length > 0
+
+    if (!hasText && !hasPhoto && !hasDocument) return
 
     const chatType: string = ctx.chat?.type  // 'private' | 'group' | 'supergroup'
     const chatId = String(ctx.chat?.id ?? '')
@@ -117,10 +125,15 @@ export class TelegramConnector implements Connector {
       ? `${chatId}:${msg.reply_to_message.message_id}`
       : null
 
+    // Process attachments
+    const { attachments, note } = await this.processMessageMedia(msg)
+
+    const text = msg.text ?? ''
+
     if (chatType === 'private') {
-      await this.handleDM({ chatId, senderId, senderName, text: msg.text, externalMsgId, replyToMsgId, raw: JSON.stringify(msg) })
+      await this.handleDM({ chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw: JSON.stringify(msg), attachments, note })
     } else if (chatType === 'group' || chatType === 'supergroup') {
-      await this.handleGroup(ctx, { chatId, senderId, senderName, text: msg.text, externalMsgId, replyToMsgId, raw: JSON.stringify(msg) })
+      await this.handleGroup(ctx, { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw: JSON.stringify(msg), attachments, note })
     }
   }
 
@@ -132,10 +145,12 @@ export class TelegramConnector implements Connector {
     externalMsgId: string
     replyToMsgId: string | null
     raw: string
+    attachments?: Attachment[]
+    note?: string
   }): Promise<void> {
     if (this.config.dm_enabled === false) return
 
-    const { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw } = opts
+    const { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw, attachments, note } = opts
 
     // Session control commands — reset the conversation without invoking the agent
     if (text === '/start' || text === '/clear') {
@@ -144,7 +159,13 @@ export class TelegramConnector implements Connector {
       return
     }
 
-    if (!this.storeInbound({ scopeType: 'dm', scopeId: chatId, externalMsgId, replyToMsgId, senderId, senderName, content: text, raw })) {
+    // Build prompt with file notes
+    let prompt = text
+    if (note) {
+      prompt = prompt ? `${prompt}\n\n${note}` : note
+    }
+
+    if (!this.storeInbound({ scopeType: 'dm', scopeId: chatId, externalMsgId, replyToMsgId, senderId, senderName, content: text, raw, attachments })) {
       return  // duplicate
     }
 
@@ -153,7 +174,7 @@ export class TelegramConnector implements Connector {
 
     const triggerMeta: TelegramTriggerMeta = { platform: 'telegram', scopeType: 'dm', scopeId: chatId, threadId: null, senderName, senderId, externalMsgId }
 
-    enqueueInvocation({ agentId: this.agentId, triggerId, triggerType: 'telegram_dm', prompt: text, triggerContext: triggerMeta })
+    enqueueInvocation({ agentId: this.agentId, triggerId, triggerType: 'telegram_dm', prompt, triggerContext: triggerMeta, attachments })
   }
 
   private async handleGroup(ctx: any, opts: {
@@ -164,8 +185,10 @@ export class TelegramConnector implements Connector {
     externalMsgId: string
     replyToMsgId: string | null
     raw: string
+    attachments?: Attachment[]
+    note?: string
   }): Promise<void> {
-    const { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw } = opts
+    const { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw, attachments, note } = opts
     const groupTitle = ctx.chat?.title as string | undefined
 
     // Session reset command (must be @mentioned to avoid accidental triggers)
@@ -175,8 +198,14 @@ export class TelegramConnector implements Connector {
       return
     }
 
+    // Build prompt with file notes
+    let prompt = text
+    if (note) {
+      prompt = prompt ? `${prompt}\n\n${note}` : note
+    }
+
     // Store all group messages for conversation history, regardless of mention
-    if (!this.storeInbound({ scopeType: 'group', scopeId: chatId, externalMsgId, replyToMsgId, senderId, senderName, content: text, raw })) {
+    if (!this.storeInbound({ scopeType: 'group', scopeId: chatId, externalMsgId, replyToMsgId, senderId, senderName, content: text, raw, attachments })) {
       return  // duplicate
     }
 
@@ -192,9 +221,68 @@ export class TelegramConnector implements Connector {
     // Strip @mention from the prompt the agent sees
     const cleanContent = text.replace(/@\w+/g, '').trim() || text
 
+    // Rebuild prompt with cleaned content
+    prompt = cleanContent
+    if (note) {
+      prompt = prompt ? `${prompt}\n\n${note}` : note
+    }
+
     const triggerMeta: TelegramTriggerMeta = { platform: 'telegram', scopeType: 'group', scopeId: chatId, threadId: null, senderName, senderId, externalMsgId, groupTitle }
 
-    enqueueInvocation({ agentId: this.agentId, triggerId, triggerType: 'telegram_group', prompt: cleanContent, triggerContext: triggerMeta })
+    enqueueInvocation({ agentId: this.agentId, triggerId, triggerType: 'telegram_group', prompt, triggerContext: triggerMeta, attachments })
+  }
+
+  // ── Media processing ───────────────────────────────────────────────────────
+
+  /**
+   * Process Telegram message media (photos and image documents).
+   */
+  private async processMessageMedia(msg: any): Promise<{ attachments: Attachment[]; note?: string }> {
+    const attachments: Attachment[] = []
+    const notes: string[] = []
+
+    // Handle photos (array of different sizes, pick the largest)
+    if (msg.photo && msg.photo.length > 0) {
+      const largest = msg.photo.reduce((prev: any, curr: any) =>
+        curr.file_size > prev.file_size ? curr : prev
+      )
+      const file = await this.bot.telegram.getFile(largest.file_id)
+      if (file.file_path) {
+        const fileUrl = `https://api.telegram.org/file/bot${this.config.bot_token}/${file.file_path}`
+        const image = await downloadAndProcessImage(fileUrl)
+        if (image) {
+          attachments.push(image)
+        }
+      }
+
+      if (msg.photo.length > 1 || (msg.media_group_id && msg.media_group_id)) {
+        notes.push('(Note: Multiple images were sent, but I can only see one at a time.)')
+      }
+    }
+
+    // Handle image documents
+    if (msg.document && msg.document.mime_type?.startsWith('image/')) {
+      if (attachments.length === 0) {
+        // Only process if we haven't already processed a photo
+        const file = await this.bot.telegram.getFile(msg.document.file_id)
+        if (file.file_path) {
+          const fileUrl = `https://api.telegram.org/file/bot${this.config.bot_token}/${file.file_path}`
+          const image = await downloadAndProcessImage(fileUrl)
+          if (image) {
+            attachments.push(image)
+          }
+        }
+      } else {
+        notes.push(`(Note: Document "${msg.document.file_name}" was sent, but I can only see one image at a time.)`)
+      }
+    }
+
+    // Handle unsupported documents
+    if (msg.document && !msg.document.mime_type?.startsWith('image/')) {
+      notes.push(`(Note: File "${msg.document.file_name}" is not supported. I can only view images.)`)
+    }
+
+    return { attachments, note: notes.length > 0 ? notes.join('\n') : undefined }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -226,19 +314,21 @@ export class TelegramConnector implements Connector {
     senderName: string
     content: string
     raw: string
+    attachments?: Attachment[]
   }): boolean {
     try {
       getDb().prepare(`
         INSERT INTO platform_messages
           (agent_id, platform, message_type, direction, scope_type, scope_id, thread_id,
-           external_msg_id, reply_to_msg_id, sender_id, sender_name, sender_type, content, raw_payload)
-        VALUES (?, 'telegram', 'message', 'inbound', ?, ?, NULL, ?, ?, ?, ?, 'user', ?, ?)
+           external_msg_id, reply_to_msg_id, sender_id, sender_name, sender_type, content, raw_payload, attachments)
+        VALUES (?, 'telegram', 'message', 'inbound', ?, ?, NULL, ?, ?, ?, ?, 'user', ?, ?, ?)
       `).run(
         this.agentId,
         opts.scopeType, opts.scopeId,
         opts.externalMsgId, opts.replyToMsgId,
         opts.senderId, opts.senderName,
         opts.content, opts.raw,
+        JSON.stringify(opts.attachments ?? []),
       )
       return true
     } catch (err: unknown) {
