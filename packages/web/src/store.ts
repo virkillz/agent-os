@@ -9,6 +9,7 @@ import {
   type TodoItem,
   type Schedule,
   type FileEntry,
+  type TreeNode,
   type Plugin,
   type McpServer,
 } from './api.ts'
@@ -65,7 +66,9 @@ interface AppState {
 
   // Workspace
   workspaceFiles: FileEntry[]
+  workspaceTree: TreeNode[]
   loadWorkspace: () => Promise<void>
+  loadWorkspaceTree: () => Promise<void>
   deleteWorkspaceFile: (path: string) => Promise<void>
 
   // Plugins
@@ -93,6 +96,7 @@ export const useStore = create<AppState>((set, get) => ({
   notifications: [],
   notificationsLoaded: false,
   workspaceFiles: [],
+  workspaceTree: [],
   plugins: [],
   mcpServers: [],
 
@@ -280,6 +284,11 @@ export const useStore = create<AppState>((set, get) => ({
   loadWorkspace: async () => {
     const files = await api.workspace.list()
     set({ workspaceFiles: files })
+  },
+
+  loadWorkspaceTree: async () => {
+    const tree = await api.workspace.tree()
+    set({ workspaceTree: tree })
   },
 
   deleteWorkspaceFile: async (filePath) => {

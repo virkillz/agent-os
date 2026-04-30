@@ -145,6 +145,7 @@ export const api = {
 
   workspace: {
     list: () => req<FileEntry[]>('GET', '/workspace'),
+    tree: () => req<TreeNode[]>('GET', '/workspace/tree'),
     downloadUrl: (filePath: string) => `${BASE}/workspace/download?path=${encodeURIComponent(filePath)}`,
     upload: (file: File, agentId?: string) => {
       const fd = new FormData()
@@ -168,6 +169,8 @@ export const api = {
         headers: { 'Content-Type': 'text/plain' },
         body: content,
       }).then((r) => { if (!r.ok) throw new Error('Save failed'); return r.json() as Promise<{ ok: boolean }> }),
+    mkdir: (dirPath: string) =>
+      req<{ ok: boolean }>('POST', '/workspace/mkdir', { path: dirPath }),
   },
 
   // ─── Skills ───────────────────────────────────────────────────────────────
@@ -441,6 +444,14 @@ export interface FileEntry {
   uploaded_by: string | null
   created_at: string
   updated_at: string
+}
+
+export interface TreeNode {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  size_bytes?: number
+  children?: TreeNode[]
 }
 
 export interface Skill {

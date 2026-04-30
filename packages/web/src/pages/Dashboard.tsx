@@ -28,6 +28,12 @@ const tiles = [
     path: '/settings',
     image: '/dashboard/settings.png',
   },
+  {
+    label: 'EXPLORER',
+    description: 'BROWSE AND MANAGE\nWORKSPACE FILES',
+    path: '/explorer',
+    image: '/dashboard/workspace.png',
+  },
 ]
 
 export default function Dashboard() {

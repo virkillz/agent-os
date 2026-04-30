@@ -56,7 +56,7 @@ export function createApp(opts: { webDistDir?: string; workspaceDir?: string; da
   app.use('/api/workspace', createWorkspaceRouter(opts.workspaceDir ?? process.cwd()))
   app.use('/api/plugins', createPluginsRouter())
   app.use('/api/platform-tools', createPlatformToolsRouter())
-  app.use('/api/skills', createSkillsRouter(opts.workspaceDir ?? process.cwd()))
+  app.use('/api/skills', createSkillsRouter(opts.dataDir ?? process.cwd()))
 
   // ── New platform primitives ─────────────────────────────────────────────────
   // app.use('/api/boards', createBoardsRouter())

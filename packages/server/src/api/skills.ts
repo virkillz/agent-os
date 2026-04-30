@@ -3,9 +3,9 @@ import fs from 'fs'
 import path from 'path'
 import { loadSkillsFromDir } from '@mariozechner/pi-coding-agent'
 
-export function createSkillsRouter(workspaceDir: string): Router {
+export function createSkillsRouter(dataDir: string): Router {
   const router = Router()
-  const skillsDir = path.join(workspaceDir, 'skills')
+  const skillsDir = path.join(dataDir, 'skills')
 
   function ensureSkillsDir() {
     fs.mkdirSync(skillsDir, { recursive: true })

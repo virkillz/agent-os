@@ -1,0 +1,5 @@
+- [x] Create file explorer for working directory
+- [ ] Create default skill to create skill
+- [ ] add tools to connect to stable diffusion api and send image via telegram, slack, and web ui.
+- [ ] add handler so we can send image to agent and it can use vision model to tell what it is. 
+- [ ] ability to have separate connection profile for vision model.

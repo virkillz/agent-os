@@ -20,6 +20,7 @@ import SettingsSkills from './pages/settings/Skills.tsx'
 import SettingsAppearance from './pages/settings/Appearance.tsx'
 import SettingsPrompt from './pages/settings/Prompt.tsx'
 import Workspace from './pages/Workspace.tsx'
+import Explorer from './pages/Explorer.tsx'
 import Board from './pages/Board.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import Users from './pages/Users.tsx'
@@ -111,6 +112,7 @@ export default function App() {
             <Route path="/agents/:id/todos" element={<AgentTodos />} />
             <Route path="/agents/:id/schedule" element={<AgentSchedule />} />
             <Route path="/workspace" element={<Workspace />} />
+            <Route path="/explorer" element={<Explorer />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />}>
               <Route index element={<Navigate to="/settings/prompt" replace />} />

@@ -14,6 +14,14 @@ export interface FileEntry {
   updated_at: string
 }
 
+export interface TreeNode {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  size_bytes?: number
+  children?: TreeNode[]
+}
+
 function scanDir(dir: string, base: string, results: FileEntry[] = []): FileEntry[] {
   if (!fs.existsSync(dir)) return results
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -35,6 +43,35 @@ function scanDir(dir: string, base: string, results: FileEntry[] = []): FileEntr
     }
   }
   return results
+}
+
+function buildTree(dir: string, base: string): TreeNode[] {
+  if (!fs.existsSync(dir)) return []
+  const nodes: TreeNode[] = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name)
+    const rel = path.join(base, entry.name).replace(/\\/g, '/')
+    if (entry.isDirectory()) {
+      nodes.push({
+        name: entry.name,
+        path: rel,
+        type: 'dir',
+        children: buildTree(abs, rel),
+      })
+    } else {
+      const stat = fs.statSync(abs)
+      nodes.push({
+        name: entry.name,
+        path: rel,
+        type: 'file',
+        size_bytes: stat.size,
+      })
+    }
+  }
+  return nodes.sort((a, b) => {
+    if (a.type === b.type) return a.name.localeCompare(b.name)
+    return a.type === 'dir' ? -1 : 1
+  })
 }
 
 function safeResolve(workspaceDir: string, relativePath: string): string | null {
@@ -61,6 +98,33 @@ export function createWorkspaceRouter(workspaceDir: string): Router {
   router.get('/', (_req, res) => {
     const files = scanDir(workspaceDir, '')
     res.json(files)
+  })
+
+  // GET /api/workspace/tree — tree view of files and dirs
+  router.get('/tree', (_req, res) => {
+    const tree = buildTree(workspaceDir, '')
+    res.json(tree)
+  })
+
+  // POST /api/workspace/mkdir — create a directory
+  router.post('/mkdir', express.json(), (req, res) => {
+    const relPath = req.body.path as string | undefined
+    if (!relPath) {
+      res.status(400).json({ error: 'path is required' })
+      return
+    }
+    const abs = safeResolve(workspaceDir, relPath)
+    if (!abs) {
+      res.status(400).json({ error: 'Invalid path' })
+      return
+    }
+    if (fs.existsSync(abs)) {
+      res.status(409).json({ error: 'Already exists' })
+      return
+    }
+    fs.mkdirSync(abs, { recursive: true })
+    eventBus.emit({ type: 'workspace:change', path: relPath, action: 'created' })
+    res.json({ ok: true })
   })
 
   // GET /api/workspace/download?path=...
