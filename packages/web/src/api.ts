@@ -297,6 +297,8 @@ export const api = {
       req<Integration>('PATCH', `/agents/${agentId}/integrations/${iid}`, data),
     delete: (agentId: string, iid: string) =>
       req<{ ok: boolean }>('DELETE', `/agents/${agentId}/integrations/${iid}`),
+    restart: (agentId: string, iid: string) =>
+      req<{ ok: boolean }>('POST', `/agents/${agentId}/integrations/${iid}/restart`),
     platformMessages: (agentId: string, opts?: { platform?: string; scope_id?: string; thread_id?: string; limit?: number }) => {
       const params = new URLSearchParams()
       if (opts?.platform) params.set('platform', opts.platform)

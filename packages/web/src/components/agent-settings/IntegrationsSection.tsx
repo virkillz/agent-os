@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, type Integration, type PlatformMessage } from '../../api.ts'
+import { useAppEvents } from '../../hooks/useAppEvents.ts'
 import { XIcon } from './icons.tsx'
 
 const PLATFORM_LABELS: Record<string, string> = { slack: 'Slack', telegram: 'Telegram' }
@@ -430,8 +431,15 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
+  // Delete confirmation
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+
   // Message log modal
   const [msgLogIntegration, setMsgLogIntegration] = useState<Integration | null>(null)
+
+  const agentIdRef = useRef(agentId)
+  agentIdRef.current = agentId
 
   useEffect(() => {
     setLoading(true)
@@ -441,6 +449,16 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
   }, [agentId])
+
+  // Live status: refetch when a connector starts, stops, or errors for this agent
+  useAppEvents((event) => {
+    if (
+      (event.type === 'connector:started' || event.type === 'connector:stopped' || event.type === 'connector:error') &&
+      event.agentId === agentIdRef.current
+    ) {
+      api.integrations.list(agentIdRef.current).then(setIntegrations).catch(() => {})
+    }
+  })
 
   async function handleCreate() {
     setAddSaving(true)
@@ -486,10 +504,32 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
     setIntegrations((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
   }
 
-  async function handleDelete(i: Integration) {
-    if (!confirm(`Remove ${PLATFORM_LABELS[i.platform]} integration?`)) return
-    await api.integrations.delete(agentId, i.id)
-    setIntegrations((prev) => prev.filter((x) => x.id !== i.id))
+  const [restarting, setRestarting] = useState<string | null>(null)
+
+  async function handleRestart(i: Integration) {
+    setRestarting(i.id)
+    try {
+      await api.integrations.restart(agentId, i.id)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to restart connector')
+    } finally {
+      setRestarting(null)
+    }
+  }
+
+  function requestDelete(i: Integration) {
+    setDeleteConfirmId(i.id)
+    setDeleteError('')
+  }
+
+  async function confirmDelete(i: Integration) {
+    try {
+      await api.integrations.delete(agentId, i.id)
+      setIntegrations((prev) => prev.filter((x) => x.id !== i.id))
+      setDeleteConfirmId(null)
+    } catch (e: unknown) {
+      setDeleteError(e instanceof Error ? e.message : 'Failed to delete integration')
+    }
   }
 
   const availablePlatforms = (['slack', 'telegram'] as const).filter(
@@ -525,6 +565,7 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
           </div>
 
           {error && <p className="text-xs text-red-400 mb-4">{error}</p>}
+          {deleteError && <p className="text-xs text-red-400 mb-4">{deleteError}</p>}
 
           {/* Add form */}
           {showAddForm && (
@@ -581,36 +622,69 @@ export function IntegrationsSection({ agentId }: { agentId: string }) {
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <button
-                            className="text-xs px-2.5 py-1 rounded-md transition-colors"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
-                            onClick={() => setMsgLogIntegration(i)}
-                            title="View message log"
-                          >
-                            Messages
-                          </button>
-                          <button
-                            className="text-xs px-2.5 py-1 rounded-md transition-colors"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
-                            onClick={() => openEdit(i)}
-                            title="Edit configuration"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="text-xs px-2.5 py-1 rounded-md transition-colors"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
-                            onClick={() => handleToggle(i)}
-                          >
-                            {i.enabled ? 'Disable' : 'Enable'}
-                          </button>
-                          <button
-                            className="p-1.5 rounded hover:bg-red-500/10 text-muted hover:text-red-400 transition-colors"
-                            title="Remove integration"
-                            onClick={() => handleDelete(i)}
-                          >
-                            <XIcon />
-                          </button>
+                          {deleteConfirmId === i.id ? (
+                            <>
+                              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Remove?</span>
+                              <button
+                                className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
+                                onClick={() => confirmDelete(i)}
+                              >
+                                Yes, remove
+                              </button>
+                              <button
+                                className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
+                                onClick={() => { setDeleteConfirmId(null); setDeleteError('') }}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {i.enabled && i.status !== 'running' && (
+                                <button
+                                  className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                  style={{ background: 'rgba(var(--accent) / 0.12)', color: 'rgb(var(--accent))', border: '1px solid rgb(var(--accent) / 0.3)' }}
+                                  onClick={() => handleRestart(i)}
+                                  disabled={restarting === i.id}
+                                  title="Restart connector"
+                                >
+                                  {restarting === i.id ? 'Restarting…' : 'Restart'}
+                                </button>
+                              )}
+                              <button
+                                className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
+                                onClick={() => setMsgLogIntegration(i)}
+                                title="View message log"
+                              >
+                                Messages
+                              </button>
+                              <button
+                                className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
+                                onClick={() => openEdit(i)}
+                                title="Edit configuration"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
+                                onClick={() => handleToggle(i)}
+                              >
+                                {i.enabled ? 'Disable' : 'Enable'}
+                              </button>
+                              <button
+                                className="p-1.5 rounded hover:bg-red-500/10 text-muted hover:text-red-400 transition-colors"
+                                title="Remove integration"
+                                onClick={() => requestDelete(i)}
+                              >
+                                <XIcon />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

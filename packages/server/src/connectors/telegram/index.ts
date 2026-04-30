@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import chalk from 'chalk'
 import { getDb } from '../../db.js'
 import { enqueueInvocation } from '../../queue-worker.js'
+import { endAndClearChannelSession } from '../../agent-runner.js'
 import type { Connector, TelegramIntegrationConfig } from '../types.js'
 import { toTelegramText } from './format.js'
 import type { TelegramTriggerMeta } from './context.js'
@@ -22,22 +23,54 @@ export class TelegramConnector implements Connector {
   }
 
   async start(): Promise<void> {
-    this.bot.on('message', async (ctx) => {
-      try {
-        await this.handleMessage(ctx)
-      } catch (err) {
-        console.error(chalk.red('[telegram]'), 'message handler error:', err instanceof Error ? err.message : err)
+    // Retry on 409: a stale long-poll connection from a previous server instance can
+    // linger for up to ~60 s. Retrying with backoff lets the old session expire.
+    // bot.launch() runs indefinitely on success (resolves only when stopped), so we
+    // fire it in the background and wait for botInfo to be set to confirm startup.
+    const maxRetries = 5
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        // Fresh instance needed — Telegraf doesn't reset internal state after a failed launch
+        this.bot = new Telegraf(this.config.bot_token)
       }
-    })
 
-    // launch() starts long polling and resolves once the bot is ready
-    await this.bot.launch()
+      this.bot.on('message', async (ctx) => {
+        try {
+          await this.handleMessage(ctx)
+        } catch (err) {
+          console.error(chalk.red('[telegram]'), 'message handler error:', err instanceof Error ? err.message : err)
+        }
+      })
+
+      let startError: unknown = null
+      const launching = this.bot.launch().catch((err) => { startError = err })
+
+      // Wait until botInfo is populated (success) or an error is captured
+      await new Promise<void>((resolve) => {
+        const tick = setInterval(() => {
+          if (this.bot.botInfo || startError !== null) { clearInterval(tick); resolve() }
+        }, 100)
+        launching.then(() => { clearInterval(tick); resolve() })
+      })
+
+      if (!startError) break
+
+      const msg = startError instanceof Error ? startError.message : String(startError)
+      if (msg.includes('409') && attempt < maxRetries) {
+        const delaySec = (attempt + 1) * 5
+        console.warn(chalk.yellow('[telegram]'), `409 conflict on start — retrying in ${delaySec}s (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise((r) => setTimeout(r, delaySec * 1000))
+      } else {
+        throw startError instanceof Error ? startError : new Error(msg)
+      }
+    }
+
     this.botUsername = this.bot.botInfo?.username ?? null
     console.log(chalk.green('[telegram]'), `connector started (agent: ${this.agentId}, bot: @${this.botUsername ?? 'unknown'})`)
   }
 
   async stop(): Promise<void> {
-    this.bot.stop()
+    await this.bot.stop()
     console.log(chalk.dim('[telegram]'), `connector stopped (agent: ${this.agentId})`)
   }
 
@@ -104,6 +137,13 @@ export class TelegramConnector implements Connector {
 
     const { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw } = opts
 
+    // Session control commands — reset the conversation without invoking the agent
+    if (text === '/start' || text === '/clear') {
+      endAndClearChannelSession(this.agentId, `telegram:dm:${chatId}`)
+      await this.bot.telegram.sendMessage(chatId, 'New conversation started.')
+      return
+    }
+
     if (!this.storeInbound({ scopeType: 'dm', scopeId: chatId, externalMsgId, replyToMsgId, senderId, senderName, content: text, raw })) {
       return  // duplicate
     }
@@ -127,6 +167,13 @@ export class TelegramConnector implements Connector {
   }): Promise<void> {
     const { chatId, senderId, senderName, text, externalMsgId, replyToMsgId, raw } = opts
     const groupTitle = ctx.chat?.title as string | undefined
+
+    // Session reset command (must be @mentioned to avoid accidental triggers)
+    if ((text === '/clear' || text === '/start') && this.isBotMentioned(ctx.message)) {
+      endAndClearChannelSession(this.agentId, `telegram:group:${chatId}`)
+      await this.bot.telegram.sendMessage(chatId, 'New conversation started.')
+      return
+    }
 
     // Store all group messages for conversation history, regardless of mention
     if (!this.storeInbound({ scopeType: 'group', scopeId: chatId, externalMsgId, replyToMsgId, senderId, senderName, content: text, raw })) {

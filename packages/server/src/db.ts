@@ -275,6 +275,36 @@ function runMigrations(db: DB): void {
     );
     CREATE INDEX IF NOT EXISTS idx_agent_mcp_servers_agent ON agent_mcp_servers(agent_id);
 
+    -- ── Channel Sessions ──────────────────────────────────────────────────────
+    --
+    -- One persistent conversation session per (agent, channel).
+    -- A "channel" is any unique conversation surface: a Telegram DM, a Slack
+    -- channel/thread, or the Web UI.  The channel_key encodes the surface:
+    --   web:dm:default          — Web UI chat
+    --   telegram:dm:{chatId}    — Telegram DM
+    --   telegram:group:{chatId} — Telegram group
+    --   slack:dm:{channelId}    — Slack DM
+    --   slack:channel:{id}[:{threadTs}] — Slack channel (per-thread)
+    --
+    -- The id column is also used as the on-disk session directory name so
+    -- each channel gets isolated SDK session storage.
+    --
+    -- ended_at IS NULL means currently active session for that channel.
+    -- Setting ended_at ends the session; the next message creates a new row.
+
+    CREATE TABLE IF NOT EXISTS channel_sessions (
+      id          TEXT PRIMARY KEY,
+      agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      channel_key TEXT NOT NULL,
+      platform    TEXT NOT NULL,
+      scope_type  TEXT,
+      scope_id    TEXT,
+      started_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      ended_at    TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_channel_sessions_active
+      ON channel_sessions(agent_id, channel_key, ended_at);
+
     -- ── Platform Messages ─────────────────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS platform_messages (
@@ -542,6 +572,17 @@ export interface NotificationRow {
   created_at: string
 }
 
+export interface ChannelSessionRow {
+  id: string
+  agent_id: string
+  channel_key: string
+  platform: string
+  scope_type: string | null
+  scope_id: string | null
+  started_at: string
+  ended_at: string | null
+}
+
 // ── Query helpers ─────────────────────────────────────────────────────────────
 
 export function getAgentMemory(agentId: string): MemoryRow[] {
@@ -561,6 +602,37 @@ export function getAllAgents(): { id: string; name: string; role: string }[] {
   return getDb()
     .prepare('SELECT id, name, role FROM agents ORDER BY name ASC')
     .all() as { id: string; name: string; role: string }[]
+}
+
+// ── Channel session helpers ────────────────────────────────────────────────────
+
+export function getActiveChannelSession(agentId: string, channelKey: string): ChannelSessionRow | null {
+  const row = getDb()
+    .prepare('SELECT * FROM channel_sessions WHERE agent_id = ? AND channel_key = ? AND ended_at IS NULL')
+    .get(agentId, channelKey) as ChannelSessionRow | undefined
+  return row ?? null
+}
+
+export function createChannelSession(
+  agentId: string,
+  channelKey: string,
+  platform: string,
+  scopeType?: string,
+  scopeId?: string,
+): ChannelSessionRow {
+  const id = randomUUID()
+  getDb()
+    .prepare(
+      'INSERT INTO channel_sessions (id, agent_id, channel_key, platform, scope_type, scope_id) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+    .run(id, agentId, channelKey, platform, scopeType ?? null, scopeId ?? null)
+  return { id, agent_id: agentId, channel_key: channelKey, platform, scope_type: scopeType ?? null, scope_id: scopeId ?? null, started_at: new Date().toISOString(), ended_at: null }
+}
+
+export function endChannelSession(sessionId: string): void {
+  getDb()
+    .prepare("UPDATE channel_sessions SET ended_at = datetime('now') WHERE id = ?")
+    .run(sessionId)
 }
 
 

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
-import { chatWithAgent, clearSession, type AgentRecord } from '../agent-runner.js'
+import { chatWithAgent, endAndClearChannelSession, type AgentRecord } from '../agent-runner.js'
 import type { AgentRow } from './agents.js'
 
 interface MessageRow {
@@ -37,10 +37,18 @@ export function createChatRouter(): Router {
     const { message } = req.body as { message: string }
     if (!message?.trim()) return res.status(400).json({ error: 'message required' })
 
-    // Persist user message
+    // Persist user message to chat_messages (web UI history)
     getDb()
       .prepare('INSERT INTO chat_messages (agent_id, role, content) VALUES (?, ?, ?)')
       .run(agent.id, 'user', message.trim())
+
+    // Also write to platform_messages so web conversations are searchable cross-platform
+    getDb().prepare(`
+      INSERT INTO platform_messages
+        (agent_id, platform, message_type, direction, scope_type, scope_id,
+         sender_id, sender_name, sender_type, content)
+      VALUES (?, 'web', 'message', 'inbound', 'dm', 'default', 'user', 'User', 'user', ?)
+    `).run(agent.id, message.trim())
 
     try {
       const agentRecord: AgentRecord = {
@@ -60,6 +68,13 @@ export function createChatRouter(): Router {
         .prepare('INSERT INTO chat_messages (agent_id, role, content) VALUES (?, ?, ?)')
         .run(agent.id, 'assistant', reply)
 
+      getDb().prepare(`
+        INSERT INTO platform_messages
+          (agent_id, platform, message_type, direction, scope_type, scope_id,
+           sender_id, sender_name, sender_type, content)
+        VALUES (?, 'web', 'message', 'outbound', 'dm', 'default', ?, ?, 'agent', ?)
+      `).run(agent.id, agent.id, agent.name, reply)
+
       res.json({ reply })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -68,13 +83,14 @@ export function createChatRouter(): Router {
     }
   })
 
-  // DELETE /api/agents/:id/chat — clear history and reset session
+  // DELETE /api/agents/:id/chat — clear history and end the web channel session
   router.delete('/:id/chat', (req, res) => {
     getDb()
       .prepare('DELETE FROM chat_messages WHERE agent_id = ?')
       .run(req.params.id)
 
-    clearSession(req.params.id)
+    // End the channel session so the next message starts a fresh conversation
+    endAndClearChannelSession(req.params.id, 'web:dm:default')
 
     res.json({ ok: true })
   })

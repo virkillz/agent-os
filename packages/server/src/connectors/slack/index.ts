@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto'
 import chalk from 'chalk'
 import { getDb } from '../../db.js'
 import { enqueueInvocation } from '../../queue-worker.js'
+import { endAndClearChannelSession } from '../../agent-runner.js'
 import type { Connector, SlackIntegrationConfig } from '../types.js'
 import { toSlackMarkdown } from './format.js'
 import type { SlackTriggerMeta } from './context.js'
@@ -109,6 +110,17 @@ export class SlackConnector implements Connector {
 
     const { channel: channelId, user: senderId, text = '', ts } = message
     const externalMsgId = `${channelId}:${ts}`
+
+    // Session control commands
+    if (text.trim() === '/clear' || text.trim() === '/start') {
+      endAndClearChannelSession(this.agentId, `slack:dm:${channelId}`)
+      await this.app.client.chat.postMessage({
+        token: this.config.bot_token,
+        channel: channelId,
+        text: 'New conversation started.',
+      })
+      return
+    }
 
     const senderName = await this.resolveUserName(senderId)
 

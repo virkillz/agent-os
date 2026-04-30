@@ -187,7 +187,7 @@ export default function Layout({ currentUser, onLogout }: LayoutProps) {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-y-auto">
         <Outlet context={{ currentUser, onLogout }} />
       </main>
     </div>

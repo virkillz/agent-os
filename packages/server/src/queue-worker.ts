@@ -1,61 +1,43 @@
 import chalk from 'chalk'
 import { getDb, type InvocationQueueRow } from './db.js'
-import { invokeAgent, isDebugMode, type AgentRecord, type ModelConfig } from './agent-runner.js'
+import { invokeAgent, chatWithChannel, isDebugMode, type AgentRecord, type ModelConfig } from './agent-runner.js'
 import { eventBus } from './event-bus.js'
 import { connectorLoader } from './connectors/loader.js'
-import { buildSlackContextAddendum, buildConversationHistoryBlock, type SlackTriggerMeta } from './connectors/slack/context.js'
-import { buildTelegramContextAddendum, type TelegramTriggerMeta } from './connectors/telegram/context.js'
+import { type SlackTriggerMeta } from './connectors/slack/context.js'
+import { type TelegramTriggerMeta } from './connectors/telegram/context.js'
 
 // ── Platform trigger context ───────────────────────────────────────────────
 
 type PlatformTriggerContext = SlackTriggerMeta | TelegramTriggerMeta
 
-function buildPlatformAddendum(
-  ctx: PlatformTriggerContext,
-  agentId: string,
-  historyWindow: number,
-): string {
-  const db = getDb()
-
-  // Build trigger context addendum text
-  const contextText = ctx.platform === 'telegram'
-    ? buildTelegramContextAddendum(ctx)
-    : buildSlackContextAddendum(ctx)
-
-  // Fetch conversation history from platform_messages
-  const rows = db.prepare(`
-    SELECT sender_name, sender_type, content, created_at
-    FROM platform_messages
-    WHERE agent_id = ?
-      AND platform = ?
-      AND scope_id = ?
-      AND (
-        (? IS NOT NULL AND thread_id = ?)
-        OR (? IS NULL AND thread_id IS NULL)
-      )
-    ORDER BY created_at ASC
-    LIMIT ?
-  `).all(
-    agentId, ctx.platform, ctx.scopeId,
-    ctx.threadId, ctx.threadId,
-    ctx.threadId,
-    historyWindow,
-  ) as { sender_name: string; sender_type: string; content: string; created_at: string }[]
-
-  let historyLabel: string
+/**
+ * Build a compact one-line header prepended to each platform message so the
+ * agent always knows who sent it and can reference the message ID for reactions.
+ * The session itself maintains full conversation history — no history injection needed.
+ */
+function buildMessageHeader(ctx: PlatformTriggerContext): string {
   if (ctx.platform === 'telegram') {
-    historyLabel = ctx.scopeType === 'dm'
-      ? 'Telegram DM'
-      : `Telegram ${ctx.groupTitle ? ctx.groupTitle : ctx.scopeId}`
-  } else {
-    historyLabel = ctx.scopeType === 'dm'
-      ? 'Slack DM'
-      : `Slack ${ctx.channelName ? '#' + ctx.channelName : ctx.scopeId}`
+    const surface = ctx.scopeType === 'group'
+      ? `Telegram Group${(ctx as TelegramTriggerMeta).groupTitle ? ' "' + (ctx as TelegramTriggerMeta).groupTitle + '"' : ''}`
+      : 'Telegram DM'
+    return `[${surface} | From: ${ctx.senderName} | msg_id:${ctx.externalMsgId}]`
   }
+  const surface = ctx.scopeType === 'channel'
+    ? `Slack #${(ctx as SlackTriggerMeta).channelName ?? ctx.scopeId}`
+    : 'Slack DM'
+  return `[${surface} | From: ${ctx.senderName} | msg_id:${ctx.externalMsgId}]`
+}
 
-  const historyText = buildConversationHistoryBlock(rows, historyLabel)
-
-  return [contextText, historyText].filter(Boolean).join('\n\n')
+/** Derive a stable channel key from the trigger context for session lookup. */
+function buildChannelKey(ctx: PlatformTriggerContext): string {
+  if (ctx.platform === 'telegram') {
+    return `telegram:${ctx.scopeType}:${ctx.scopeId}`
+  }
+  // Slack: threads are isolated sessions; top-level DMs share one session
+  if (ctx.scopeType === 'channel' && ctx.threadId) {
+    return `slack:channel:${ctx.scopeId}:${ctx.threadId}`
+  }
+  return `slack:${ctx.scopeType}:${ctx.scopeId}`
 }
 
 function getFallbackModel(): ModelConfig {
@@ -102,16 +84,22 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
     console.log(chalk.cyan('[queue-worker]'), chalk.bold('processing'), `queueId=${row.id}`, `agent=${agent.name}`, `type=${row.trigger_type}`)
   }
 
-  // Build platform addendum (trigger context + conversation history) if this is a platform invocation
   const ctx = payload.triggerContext
-  const historyWindow = 20  // TODO: read from integration config
-  const systemPromptAddendum = ctx ? buildPlatformAddendum(ctx, row.agent_id, historyWindow) : undefined
 
   try {
-    const response = await invokeAgent(agent, payload.prompt, getFallbackModel(), {
-      systemPromptAddendum,
-      rawPrompt: ctx !== undefined,
-    })
+    let response: string
+    if (ctx) {
+      // Platform message (Telegram/Slack): use the persistent channel session so the
+      // agent has full conversation memory. Prepend a compact header with sender info
+      // and message ID (needed for reactions); the session handles history itself.
+      const channelKey = buildChannelKey(ctx)
+      const header = buildMessageHeader(ctx)
+      const message = `${header}\n${payload.prompt}`
+      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId)
+    } else {
+      // Scheduled / other non-platform trigger: isolated fresh session (existing behaviour)
+      response = await invokeAgent(agent, payload.prompt, getFallbackModel())
+    }
 
     // Store outbound platform message and deliver via connector
     if (ctx) {

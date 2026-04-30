@@ -15,11 +15,16 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
-import { getAgentMemory, getAgentTodos, getAllAgents, getDb, type ConnectionProfileRow } from './db.js'
+import {
+  getAgentMemory, getAgentTodos, getDb,
+  getActiveChannelSession, createChannelSession, endChannelSession,
+  type ConnectionProfileRow,
+} from './db.js'
 import { eventBus } from './event-bus.js'
 import { buildAgentTools } from './platform-tools.js'
 import { platformToolLoader } from './platform-tools/loader.js'
 import { pluginLoader } from './plugin-loader.js'
+import { getMcpToolsForAgent } from './mcp-client.js'
 
 let debugMode = false
 
@@ -60,12 +65,14 @@ export interface AgentRecord {
 interface LiveSession {
   session: Awaited<ReturnType<typeof createAgentSession>>['session']
   unsubscribe: (() => void) | null
+  mcpCleanup?: () => Promise<void>
 }
 
-// One persistent session per agent, keyed by agent ID.
+// Persistent sessions keyed by "${agentId}:${channelSessionId}".
+// Each channel (web, telegram DM, slack channel, etc.) gets its own session.
 const liveSessions = new Map<string, LiveSession>()
 
-// Pending resolve callbacks for in-flight chat requests.
+// Pending resolve callbacks for in-flight chat requests, keyed by liveKey.
 const pending = new Map<string, { chunks: string[]; resolve: (text: string) => void }>()
 
 let dataDir = process.cwd()
@@ -99,12 +106,6 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     : ''
   const todoBlock = todos.length
     ? `## Your Open Todos\n${todos.map((t) => `[${t.id}] ${t.text}`).join('\n')}`
-    : ''
-
-  // ── Static context: agents + channels ────────────────────────────────────
-  const allAgents = getAllAgents()
-  const agentsBlock = allAgents.length
-    ? `## Directory \n\n### Available Team Members\n${allAgents.map((a) => `- ${a.name} (id: ${a.id}) — ${a.role}`).join('\n')}`
     : ''
 
   // ── Build toolsBlock from active platform tool groups + plugins ───────────
@@ -141,7 +142,7 @@ export function buildSystemPrompt(agent: AgentRecord, workspaceDir: string): str
     `## How You Work\n\nAs a virtual employee, here is how you operate.\n\n` +
     toolSections.join('\n\n')
 
-  return [identityBlock, toolsBlock, agentsBlock, memoryBlock, todoBlock]
+  return [identityBlock, toolsBlock, memoryBlock, todoBlock]
     .filter(Boolean)
     .join('\n\n')
 }
@@ -159,9 +160,14 @@ async function createLiveSession(
   agent: AgentRecord,
   defaultModel: ModelConfig,
   systemPromptOverride?: string,
+  channelSessionId?: string,
 ): Promise<LiveSession> {
   const config = resolveModelConfig(agent.model_config, defaultModel)
 
+  // Load MCP tools for this agent
+  const mcp = await getMcpToolsForAgent(agent.id)
+
+  try {
   // Check if agent has a connection profile assigned
   let connectionProfile: ConnectionProfileRow | null = null
   if (config.connectionProfileId) {
@@ -222,17 +228,25 @@ async function createLiveSession(
   if (!model) throw new Error(`Model not found: ${config.provider}/${config.modelId}`)
 
   const workspaceDir = resolveWorkspaceDir()
-  const systemPrompt = systemPromptOverride ?? buildSystemPrompt(agent, workspaceDir)
+  let systemPrompt = systemPromptOverride ?? buildSystemPrompt(agent, workspaceDir)
+  if (mcp.sections.length > 0) {
+    systemPrompt += '\n\n' + mcp.sections.join('\n\n')
+  }
   if (debugMode) {
     dbg(agent.name, chalk.bold('── NEW SESSION ──'))
     dbg(agent.name, chalk.dim('system prompt:\n') + systemPrompt)
   }
-  const sessionsDir = path.join(dataDir, 'sessions', agent.id)
+  const sessionsDir = channelSessionId
+    ? path.join(dataDir, 'sessions', agent.id, channelSessionId)
+    : path.join(dataDir, 'sessions', agent.id)
 
   // Build platform tools from the agent's declared tool list
   const toolIds: string[] = config.tools ?? []
   const disabledTools: string[] = config.disabledTools ?? []
-  const customTools = buildAgentTools(toolIds, { agentId: agent.id, workspaceDir }, disabledTools)
+  const customTools = [
+    ...buildAgentTools(toolIds, { agentId: agent.id, workspaceDir }, disabledTools),
+    ...mcp.tools,
+  ]
 
   const allowedSkills: string[] | undefined = config.allowedSkills
 
@@ -273,10 +287,12 @@ async function createLiveSession(
     sessionManager: SessionManager.create(dataDir, sessionsDir),
   })
 
-  const liveSession: LiveSession = { session, unsubscribe: null }
+  const liveSession: LiveSession = { session, unsubscribe: null, mcpCleanup: mcp.cleanup }
+
+  const pendingKey = channelSessionId ? `${agent.id}:${channelSessionId}` : agent.id
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
-    const p = pending.get(agent.id)
+    const p = pending.get(pendingKey)
 
     // Debug logging for all notable events
     if (debugMode) {
@@ -342,41 +358,74 @@ async function createLiveSession(
   liveSession.unsubscribe = typeof unsubscribe === 'function' ? unsubscribe : null
 
   return liveSession
+  } catch (err) {
+    await mcp.cleanup()
+    throw err
+  }
 }
 
+/** Web UI chat — delegates to chatWithChannel using the 'web:dm:default' channel key. */
 export async function chatWithAgent(
   agent: AgentRecord,
   message: string,
   defaultModel: ModelConfig,
 ): Promise<string> {
-  if (!liveSessions.has(agent.id)) {
-    const live = await createLiveSession(agent, defaultModel)
-    liveSessions.set(agent.id, live)
+  return chatWithChannel(agent, 'web:dm:default', 'web', message, defaultModel, 'dm', 'default')
+}
+
+/**
+ * Send a message on a persistent channel session.
+ * The channel is identified by channelKey (e.g. "telegram:dm:123456").
+ * A channel_sessions row is created on first use; subsequent messages reuse
+ * the same row and the same on-disk SDK session (full conversation memory).
+ */
+export async function chatWithChannel(
+  agent: AgentRecord,
+  channelKey: string,
+  platform: string,
+  message: string,
+  defaultModel: ModelConfig,
+  scopeType?: string,
+  scopeId?: string,
+): Promise<string> {
+  let channelSession = getActiveChannelSession(agent.id, channelKey)
+  if (!channelSession) {
+    channelSession = createChannelSession(agent.id, channelKey, platform, scopeType, scopeId)
   }
 
-  const live = liveSessions.get(agent.id)!
+  const liveKey = `${agent.id}:${channelSession.id}`
+
+  if (!liveSessions.has(liveKey)) {
+    const live = await createLiveSession(agent, defaultModel, undefined, channelSession.id)
+    liveSessions.set(liveKey, live)
+  }
+
+  const live = liveSessions.get(liveKey)!
 
   eventBus.emit({ type: 'agent:thinking', agentId: agent.id })
 
   if (debugMode) {
+    dbg(agent.name, chalk.green('→ channel:'), channelKey)
     dbg(agent.name, chalk.green('→ sending:'), message.length > 500 ? message.slice(0, 500) + '…' : message)
   }
 
   return new Promise((resolve, reject) => {
-    pending.set(agent.id, { chunks: [], resolve })
+    pending.set(liveKey, { chunks: [], resolve })
 
     live.session.prompt(message, { streamingBehavior: 'followUp' })
       .then(() => live.session.agent.waitForIdle())
       .then(() => {
-        const p = pending.get(agent.id)
-        pending.delete(agent.id)
+        const p = pending.get(liveKey)
+        pending.delete(liveKey)
         const text = p?.chunks.join('') ?? ''
         eventBus.emit({ type: 'agent:idle', agentId: agent.id })
         resolve(text)
       })
       .catch((err: unknown) => {
-        pending.delete(agent.id)
-        liveSessions.delete(agent.id)
+        pending.delete(liveKey)
+        const live = liveSessions.get(liveKey)
+        if (live?.mcpCleanup) live.mcpCleanup().catch(() => {})
+        liveSessions.delete(liveKey)
         const msg = err instanceof Error ? err.message : String(err)
         eventBus.emit({ type: 'agent:error', agentId: agent.id, error: msg })
         reject(err)
@@ -384,10 +433,34 @@ export async function chatWithAgent(
   })
 }
 
+/**
+ * Remove all live sessions for an agent from the in-memory map.
+ * Forces the next message to reload the session from disk (picks up updated system prompt).
+ * Does NOT end channel_sessions records — use endAndClearChannelSession for that.
+ */
 export function clearSession(agentId: string): void {
-  const live = liveSessions.get(agentId)
+  for (const [key, live] of [...liveSessions.entries()]) {
+    if (key.startsWith(`${agentId}:`)) {
+      if (live.unsubscribe) live.unsubscribe()
+      live.mcpCleanup?.().catch(() => {})
+      liveSessions.delete(key)
+    }
+  }
+}
+
+/**
+ * End a channel's conversation: marks the channel_sessions row as ended and
+ * removes the live session from memory. The next message starts a fresh session.
+ */
+export function endAndClearChannelSession(agentId: string, channelKey: string): void {
+  const channelSession = getActiveChannelSession(agentId, channelKey)
+  if (!channelSession) return
+  endChannelSession(channelSession.id)
+  const liveKey = `${agentId}:${channelSession.id}`
+  const live = liveSessions.get(liveKey)
   if (live?.unsubscribe) live.unsubscribe()
-  liveSessions.delete(agentId)
+  live?.mcpCleanup?.().catch(() => {})
+  liveSessions.delete(liveKey)
 }
 
 export interface InvokeAgentOpts {
@@ -461,12 +534,14 @@ export async function runScheduledTask(
       .then(() => {
         if (typeof unsubscribe === 'function') unsubscribe()
         if (live.unsubscribe) live.unsubscribe()
+        live.mcpCleanup?.().catch(() => {})
         eventBus.emit({ type: 'agent:idle', agentId: agent.id })
         resolve(chunks.join(''))
       })
       .catch((err: unknown) => {
         if (typeof unsubscribe === 'function') unsubscribe()
         if (live.unsubscribe) live.unsubscribe()
+        live.mcpCleanup?.().catch(() => {})
         const msg = err instanceof Error ? err.message : String(err)
         eventBus.emit({ type: 'agent:error', agentId: agent.id, error: msg })
         reject(err)

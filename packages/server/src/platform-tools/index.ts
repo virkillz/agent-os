@@ -12,6 +12,7 @@ import { todosTool } from './todos/index.js'
 import { schedulingTool } from './scheduling/index.js'
 import { agentMgmtTool } from './agent-mgmt/index.js'
 import { platformCommsTool } from './platform-comms/index.js'
+import { conversationSearchTool } from './conversation-search/index.js'
 
 export {
   memoryTool,
@@ -20,6 +21,7 @@ export {
   schedulingTool,
   agentMgmtTool,
   platformCommsTool,
+  conversationSearchTool,
 }
 
 export const builtInPlatformTools = [
@@ -29,4 +31,5 @@ export const builtInPlatformTools = [
   schedulingTool,
   agentMgmtTool,
   platformCommsTool,
+  conversationSearchTool,
 ]

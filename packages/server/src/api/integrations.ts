@@ -111,6 +111,17 @@ export function createIntegrationsRouter(): Router {
     res.json({ ...updated, config: maskConfig(updated.platform, updated.config), ...connectorLoader.statusOf(req.params.id, updated.platform) })
   })
 
+  // POST /api/agents/:id/integrations/:iid/restart
+  router.post('/:id/integrations/:iid/restart', (req, res) => {
+    const row = getDb()
+      .prepare('SELECT * FROM agent_integrations WHERE id = ? AND agent_id = ?')
+      .get(req.params.iid, req.params.id) as unknown as AgentIntegrationRow | undefined
+    if (!row) return res.status(404).json({ error: 'Integration not found' })
+
+    eventBus.emit({ type: 'integration:config_updated', agentId: req.params.id, platform: row.platform })
+    res.json({ ok: true })
+  })
+
   // DELETE /api/agents/:id/integrations/:iid
   router.delete('/:id/integrations/:iid', (req, res) => {
     const db = getDb()

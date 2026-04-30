@@ -196,7 +196,7 @@ export default function AgentSettings() {
       </aside>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-y-auto flex flex-col">
         {section === 'profile' && <ProfileSection agent={agent} onSave={handleSave} />}
         {section === 'avatar' && <AvatarSection agent={agent} onSave={handleSave} />}
         {section === 'connection' && <ConnectionSection agent={agent} onSave={handleSave as (data: { modelConfig: object }) => Promise<unknown>} />}
