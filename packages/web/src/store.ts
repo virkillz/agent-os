@@ -61,6 +61,7 @@ interface AppState {
   prependNotification: (n: Notification) => void
   markNotificationRead: (id: string) => Promise<void>
   markAllNotificationsRead: () => Promise<void>
+  clearNotifications: () => void
 
   // Unread DM channels (set of channel IDs with unread messages)
   unreadDmChannels: Set<string>
@@ -274,6 +275,10 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => ({
       notifications: s.notifications.map((n) => ({ ...n, is_read: true })),
     }))
+  },
+
+  clearNotifications: () => {
+    set({ notifications: [] })
   },
 
   // ─── Unread DMs ─────────────────────────────────────────────────────────────

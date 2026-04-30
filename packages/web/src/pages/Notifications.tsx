@@ -18,7 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default function Notifications() {
-  const { agents, notifications, pushNotification, clearNotifications, loadSchedules } = useStore()
+  const { agents, notifications, prependNotification, clearNotifications, loadSchedules } = useStore()
 
   function agentName(id: string) {
     return agents.find((a) => a.id === id)?.name ?? id
@@ -26,16 +26,16 @@ export default function Notifications() {
 
   useAppEvents((event) => {
     if (event.type === 'agent:error') {
-      pushNotification({ message: `${agentName(event.agentId)}: ${event.error}`, type: 'error' })
+      prependNotification({ message: `${agentName(event.agentId)}: ${event.error}`, type: 'error', source_event: event.type, meta: '{}', created_at: new Date().toISOString(), is_read: true, id: crypto.randomUUID() })
     } else if (event.type === 'schedule:fired') {
-      pushNotification({ message: `Schedule fired for ${agentName(event.agentId)}: ${event.label || 'unnamed'}`, type: 'schedule' })
+      prependNotification({ message: `Schedule fired for ${agentName(event.agentId)}: ${event.label || 'unnamed'}`, type: 'schedule', source_event: event.type, meta: '{}', created_at: new Date().toISOString(), is_read: true, id: crypto.randomUUID() })
     } else if (event.type === 'schedule:created') {
       loadSchedules(event.agentId)
-      pushNotification({ message: `${agentName(event.agentId)} created schedule: ${event.label || 'unnamed'}`, type: 'schedule' })
+      prependNotification({ message: `${agentName(event.agentId)} created schedule: ${event.label || 'unnamed'}`, type: 'schedule', source_event: event.type, meta: '{}', created_at: new Date().toISOString(), is_read: true, id: crypto.randomUUID() })
     } else if (event.type === 'board:card_moved') {
-      pushNotification({ message: `Card moved: "${event.title}"`, type: 'board' })
+      prependNotification({ message: `Card moved: "${event.title}"`, type: 'board', source_event: event.type, meta: '{}', created_at: new Date().toISOString(), is_read: true, id: crypto.randomUUID() })
     } else if (event.type === 'agent:idle') {
-      pushNotification({ message: `${agentName(event.agentId)} finished`, type: 'agent' })
+      prependNotification({ message: `${agentName(event.agentId)} finished`, type: 'agent', source_event: event.type, meta: '{}', created_at: new Date().toISOString(), is_read: true, id: crypto.randomUUID() })
     }
   })
 
@@ -85,7 +85,7 @@ export default function Notifications() {
                       {TYPE_LABELS[n.type] ?? n.type}
                     </span>
                     <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
-                      {n.at.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(n.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 </div>
