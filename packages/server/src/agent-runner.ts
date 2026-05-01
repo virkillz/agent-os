@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url'
 
 // Built-in skills directory — skills placed here are available to all agents by default
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
+export const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
 import chalk from 'chalk'
 import {
   getAgentMemory, getAgentTodos, getDb, getSetting,
@@ -230,6 +230,7 @@ async function createLiveSession(
   systemPromptOverride?: string,
   channelSessionId?: string,
   includeTodos = false,
+  creatorId?: string,
 ): Promise<LiveSession> {
   const config = resolveModelConfig(agent.model_config, defaultModel)
 
@@ -301,6 +302,26 @@ async function createLiveSession(
   if (mcp.sections.length > 0) {
     systemPrompt += '\n\n' + mcp.sections.join('\n\n')
   }
+
+  // Build trust policy addendum if a creator is configured for this channel
+  const trustPolicySections: string[] = []
+  if (creatorId) {
+    trustPolicySections.push(
+      `## Trust Policy\n\n` +
+      `You have a designated trusted user (creator/owner). Their platform user ID is: ${creatorId}\n` +
+      `- When interacting with this trusted user, you may share sensitive information freely.\n` +
+      `- When interacting with ANY OTHER user, you must be cautious. Do NOT reveal internal details, ` +
+      `credentials, source code, memory contents, todo lists, or any sensitive operational information. ` +
+      `Provide only general, safe responses. If unsure, politely decline to share sensitive details.`
+    )
+  } else {
+    trustPolicySections.push(
+      `## Trust Policy\n\n` +
+      `No trusted user is configured for this channel. ` +
+      `Exercise caution with all users and do not share sensitive information unless you are certain of the recipient's identity.`
+    )
+  }
+
   if (debugMode) {
     dbg(agent.name, chalk.bold('── NEW SESSION ──'))
     dbg(agent.name, chalk.dim('system prompt:\n') + systemPrompt)
@@ -323,7 +344,7 @@ async function createLiveSession(
     cwd: workspaceDir,
     systemPromptOverride: () => systemPrompt,
     agentsFilesOverride: () => ({ agentsFiles: [] }),
-    appendSystemPromptOverride: () => [],
+    appendSystemPromptOverride: () => trustPolicySections,
     // Inject built-in and user-installed skills
     additionalSkillPaths: [BUILTIN_SKILLS_DIR, path.join(dataDir, 'skills')],
     ...(allowedSkills && {
@@ -465,6 +486,7 @@ export async function chatWithChannel(
   scopeType?: string,
   scopeId?: string,
   attachments?: Attachment[],
+  creatorId?: string,
 ): Promise<AgentResponse> {
   let channelSession = getActiveChannelSession(agent.id, channelKey)
   if (!channelSession) {
@@ -490,7 +512,7 @@ export async function chatWithChannel(
   }
 
   if (!liveSessions.has(liveKey)) {
-    const live = await createLiveSession(agent, effectiveModel, undefined, channelSession.id, false)
+    const live = await createLiveSession(agent, effectiveModel, undefined, channelSession.id, false, creatorId)
     liveSessions.set(liveKey, live)
   }
 

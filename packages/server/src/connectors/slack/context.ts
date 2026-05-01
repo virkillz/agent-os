@@ -12,6 +12,7 @@ export interface SlackTriggerMeta {
   senderId: string
   externalMsgId: string    // Slack ts of the inbound message (encoded as "channelId:ts")
   channelName?: string     // human-readable channel name e.g. "marketing"
+  creatorId?: string       // Slack user ID of the trusted owner
 }
 
 export function buildSlackContextAddendum(ctx: SlackTriggerMeta): string {

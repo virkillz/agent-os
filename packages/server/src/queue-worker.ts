@@ -17,16 +17,17 @@ type PlatformTriggerContext = SlackTriggerMeta | TelegramTriggerMeta
  * The session itself maintains full conversation history — no history injection needed.
  */
 function buildMessageHeader(ctx: PlatformTriggerContext): string {
+  const trusted = ctx.creatorId && ctx.senderId === ctx.creatorId ? 'TRUSTED' : 'UNTRUSTED'
   if (ctx.platform === 'telegram') {
     const surface = ctx.scopeType === 'group'
       ? `Telegram Group${(ctx as TelegramTriggerMeta).groupTitle ? ' "' + (ctx as TelegramTriggerMeta).groupTitle + '"' : ''}`
       : 'Telegram DM'
-    return `[${surface} | From: ${ctx.senderName} | msg_id:${ctx.externalMsgId}]`
+    return `[${surface} | From: ${ctx.senderName} | msg_id:${ctx.externalMsgId} | ${trusted}]`
   }
   const surface = ctx.scopeType === 'channel'
     ? `Slack #${(ctx as SlackTriggerMeta).channelName ?? ctx.scopeId}`
     : 'Slack DM'
-  return `[${surface} | From: ${ctx.senderName} | msg_id:${ctx.externalMsgId}]`
+  return `[${surface} | From: ${ctx.senderName} | msg_id:${ctx.externalMsgId} | ${trusted}]`
 }
 
 /** Derive a stable channel key from the trigger context for session lookup. */
@@ -97,7 +98,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
       const channelKey = buildChannelKey(ctx)
       const header = buildMessageHeader(ctx)
       const message = `${header}\n${payload.prompt}`
-      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId, attachments)
+      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId, attachments, ctx.creatorId)
     } else {
       // Scheduled / other non-platform trigger: isolated fresh session (existing behaviour)
       response = await invokeAgent(agent, payload.prompt, getFallbackModel(), { attachments })

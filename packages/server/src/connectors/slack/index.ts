@@ -168,6 +168,7 @@ export class SlackConnector implements Connector {
       senderName,
       senderId,
       externalMsgId,
+      creatorId: this.config.creator_id,
     }
 
     enqueueInvocation({
@@ -235,6 +236,7 @@ export class SlackConnector implements Connector {
       senderId,
       externalMsgId,
       channelName,
+      creatorId: this.config.creator_id,
     }
 
     enqueueInvocation({

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { getDb, type AgentChannelRow, type PlatformMessageRow } from '../db.js'
 import { eventBus } from '../event-bus.js'
 import { connectorLoader } from '../connectors/loader.js'
+import { clearSession } from '../agent-runner.js'
 
 // Mask sensitive token fields in config before sending to client
 function maskConfig(platform: string, rawConfig: string): Record<string, unknown> {
@@ -93,6 +94,12 @@ export function createChannelsRouter(): Router {
       for (const [k, v] of Object.entries(config)) {
         // If value is '***', keep the existing value (client didn't change it)
         if (v !== '***') merged[k] = v
+      }
+      // If creator_id changed, clear live sessions so the new trust policy is picked up
+      const oldCreatorId = (existing.creator_id as string) ?? ''
+      const newCreatorId = (merged.creator_id as string) ?? ''
+      if (oldCreatorId !== newCreatorId) {
+        clearSession(req.params.id)
       }
       db.prepare("UPDATE agent_channels SET config = ?, updated_at = datetime('now') WHERE id = ?")
         .run(JSON.stringify(merged), row.id)

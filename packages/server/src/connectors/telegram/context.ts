@@ -11,6 +11,7 @@ export interface TelegramTriggerMeta {
   senderId: string
   externalMsgId: string  // "chatId:messageId" — for add_reaction on the triggering message
   groupTitle?: string    // human-readable group name, if available
+  creatorId?: string     // Telegram user ID of the trusted owner
 }
 
 export function buildTelegramContextAddendum(ctx: TelegramTriggerMeta): string {

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { loadSkillsFromDir } from '@mariozechner/pi-coding-agent'
 import { getDb, getAgentChannelSessions } from '../db.js'
-import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir, getDataDir } from '../agent-runner.js'
+import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir, getDataDir, BUILTIN_SKILLS_DIR } from '../agent-runner.js'
 import { getMcpToolsForAgent } from '../mcp-client.js'
 
 export interface AgentRow {
@@ -150,12 +150,128 @@ export function createAgentsRouter(): Router {
   })
 
   // GET /api/agents/:id/preview-prompt
-  router.get('/:id/preview-prompt', (req, res) => {
+  router.get('/:id/preview-prompt', async (req, res) => {
     const agent = getDb().prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id) as unknown as AgentRow | undefined
     if (!agent) return res.status(404).json({ error: 'Agent not found' })
+
     const workspaceDir = resolveWorkspaceDir()
-    const prompt = buildSystemPrompt(agent, workspaceDir)
-    res.json({ prompt })
+    const basePrompt = buildSystemPrompt(agent, workspaceDir)
+
+    // ── MCP sections ──────────────────────────────────────────────────────
+    let mcpSections: string[] = []
+    try {
+      const mcp = await getMcpToolsForAgent(agent.id)
+      mcpSections = mcp.sections
+      await mcp.cleanup()
+    } catch (err) {
+      console.error('[preview-prompt] MCP error:', err)
+    }
+
+    // ── Trust Policy ──────────────────────────────────────────────────────
+    // Look up creator_id from the agent's channels to match runtime behavior
+    let creatorId: string | undefined
+    try {
+      const channels = getDb()
+        .prepare('SELECT config FROM agent_channels WHERE agent_id = ? AND enabled = 1')
+        .all(agent.id) as unknown as Array<{ config: string }>
+      for (const ch of channels) {
+        const cfg = JSON.parse(ch.config) as Record<string, unknown>
+        if (cfg.creator_id && typeof cfg.creator_id === 'string') {
+          creatorId = cfg.creator_id
+          break
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const trustPolicySections: string[] = []
+    if (creatorId) {
+      trustPolicySections.push(
+        `## Trust Policy\n\n` +
+        `You have a designated trusted user (creator/owner). Their platform user ID is: ${creatorId}\n` +
+        `- When interacting with this trusted user, you may share sensitive information freely.\n` +
+        `- When interacting with ANY OTHER user, you must be cautious. Do NOT reveal internal details, ` +
+        `credentials, source code, memory contents, todo lists, or any sensitive operational information. ` +
+        `Provide only general, safe responses. If unsure, politely decline to share sensitive details.`
+      )
+    } else {
+      trustPolicySections.push(
+        `## Trust Policy\n\n` +
+        `No trusted user is configured for this channel. ` +
+        `Exercise caution with all users and do not share sensitive information unless you are certain of the recipient's identity.`
+      )
+    }
+
+    // ── Skills content ────────────────────────────────────────────────────
+    // Load from both built-in and user-installed directories, matching the
+    // runtime's DefaultResourceLoader configuration.
+    const allSkills = new Map<string, { name: string; description: string; location: string }>()
+
+    let allowedSkills: string[] | undefined
+    try {
+      const mc = JSON.parse(agent.model_config || '{}')
+      allowedSkills = mc.allowedSkills
+    } catch {
+      /* ignore parse error */
+    }
+
+    const skillDirs = [BUILTIN_SKILLS_DIR, path.join(getDataDir(), 'skills')]
+    for (const dir of skillDirs) {
+      if (!fs.existsSync(dir)) continue
+      try {
+        const { skills } = loadSkillsFromDir({ dir, source: dir === BUILTIN_SKILLS_DIR ? 'builtin' : 'workspace' })
+        const filtered = allowedSkills
+          ? skills.filter((s) => allowedSkills!.includes(s.name))
+          : skills
+        for (const skill of filtered) {
+          // Data-dir skills override built-in skills with the same name
+          allSkills.set(skill.name, {
+            name: skill.name,
+            description: skill.description,
+            location: skill.filePath,
+          })
+        }
+      } catch (err) {
+        console.error(`[preview-prompt] Skills error for ${dir}:`, err)
+      }
+    }
+
+    let skillsBlock = ''
+    if (allSkills.size > 0) {
+      const skillsList = Array.from(allSkills.values())
+      skillsBlock =
+        `## Available Skills\n\n` +
+        `The following skills provide specialized instructions for specific tasks. ` +
+        `When a task matches a skill's description, use your file-read tool to load ` +
+        `the SKILL.md at the listed location before proceeding.\n\n` +
+        `<available_skills>\n` +
+        skillsList
+          .map(
+            (s) =>
+              `  <skill>\n` +
+              `    <name>${s.name}</name>\n` +
+              `    <description>${s.description}</description>\n` +
+              `    <location>${s.location}</location>\n` +
+              `  </skill>`
+          )
+          .join('\n') +
+        '\n</available_skills>'
+    }
+
+    // ── Combine ───────────────────────────────────────────────────────────
+    let fullPrompt = basePrompt
+    if (mcpSections.length > 0) {
+      fullPrompt += '\n\n' + mcpSections.join('\n\n')
+    }
+    if (trustPolicySections.length > 0) {
+      fullPrompt += '\n\n' + trustPolicySections.join('\n\n')
+    }
+    if (skillsBlock) {
+      fullPrompt += '\n\n' + skillsBlock
+    }
+
+    res.json({ prompt: fullPrompt })
   })
 
   // GET /api/agents/:id/sessions — list session files recursively as a tree

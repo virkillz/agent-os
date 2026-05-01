@@ -232,9 +232,11 @@ type FormState = {
   bot_token: string
   channel_ids: string
   dm_enabled: boolean
+  creator_id: string
   tg_bot_token: string
   group_ids: string
   tg_dm_enabled: boolean
+  tg_creator_id: string
 }
 
 const DEFAULT_FORM: FormState = {
@@ -243,9 +245,11 @@ const DEFAULT_FORM: FormState = {
   bot_token: '',
   channel_ids: '',
   dm_enabled: true,
+  creator_id: '',
   tg_bot_token: '',
   group_ids: '',
   tg_dm_enabled: true,
+  tg_creator_id: '',
 }
 
 function channelToForm(c: AgentChannel): FormState {
@@ -257,9 +261,11 @@ function channelToForm(c: AgentChannel): FormState {
       bot_token: (cfg.bot_token as string) ?? '',
       channel_ids: Array.isArray(cfg.channel_ids) ? (cfg.channel_ids as string[]).join(', ') : '',
       dm_enabled: (cfg.dm_enabled as boolean) ?? true,
+      creator_id: (cfg.creator_id as string) ?? '',
       tg_bot_token: '',
       group_ids: '',
       tg_dm_enabled: true,
+      tg_creator_id: '',
     }
   }
   return {
@@ -268,9 +274,11 @@ function channelToForm(c: AgentChannel): FormState {
     bot_token: '',
     channel_ids: '',
     dm_enabled: true,
+    creator_id: '',
     tg_bot_token: (cfg.bot_token as string) ?? '',
     group_ids: Array.isArray(cfg.group_ids) ? (cfg.group_ids as string[]).join(', ') : '',
     tg_dm_enabled: (cfg.dm_enabled as boolean) ?? true,
+    tg_creator_id: (cfg.creator_id as string) ?? '',
   }
 }
 
@@ -281,12 +289,14 @@ function buildConfig(f: FormState): Record<string, unknown> {
       bot_token: f.bot_token,
       dm_enabled: f.dm_enabled,
       channel_ids: f.channel_ids.split(',').map((s) => s.trim()).filter(Boolean),
+      creator_id: f.creator_id.trim(),
     }
   }
   return {
     bot_token: f.tg_bot_token,
     dm_enabled: f.tg_dm_enabled,
     group_ids: f.group_ids.split(',').map((s) => s.trim()).filter(Boolean),
+    creator_id: f.tg_creator_id.trim(),
   }
 }
 
@@ -374,6 +384,15 @@ function ChannelForm({
             checked={form.dm_enabled}
             onChange={(v) => setForm((f) => ({ ...f, dm_enabled: v }))}
           />
+          <Field
+            label="Trusted User ID (optional)"
+            value={form.creator_id}
+            placeholder="U12345678"
+            onChange={(v) => setForm((f) => ({ ...f, creator_id: v }))}
+          />
+          <p className="text-[10px] text-muted -mt-2">
+            Slack user ID of the trusted owner. The agent will only share sensitive information with this user.
+          </p>
         </div>
       )}
 
@@ -398,6 +417,15 @@ function ChannelForm({
             checked={form.tg_dm_enabled}
             onChange={(v) => setForm((f) => ({ ...f, tg_dm_enabled: v }))}
           />
+          <Field
+            label="Trusted User ID (optional)"
+            value={form.tg_creator_id}
+            placeholder="123456789"
+            onChange={(v) => setForm((f) => ({ ...f, tg_creator_id: v }))}
+          />
+          <p className="text-[10px] text-muted -mt-2">
+            Telegram user ID of the trusted owner. The agent will only share sensitive information with this user.
+          </p>
         </div>
       )}
 
@@ -730,10 +758,12 @@ function ConfigSummary({ platform, config }: { platform: string; config: Record<
     if (config.dm_enabled) parts.push('DMs enabled')
     const channels = Array.isArray(config.channel_ids) ? (config.channel_ids as string[]) : []
     if (channels.length > 0) parts.push(`${channels.length} channel${channels.length > 1 ? 's' : ''}`)
+    if (config.creator_id) parts.push('Trusted user set')
   } else if (platform === 'telegram') {
     if (config.dm_enabled) parts.push('DMs enabled')
     const groups = Array.isArray(config.group_ids) ? (config.group_ids as string[]) : []
     if (groups.length > 0) parts.push(`${groups.length} group${groups.length > 1 ? 's' : ''}`)
+    if (config.creator_id) parts.push('Trusted user set')
   }
   if (parts.length === 0) return null
   return (

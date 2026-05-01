@@ -53,6 +53,7 @@ export interface SlackChannelConfig {
   bot_token: string
   dm_enabled?: boolean
   channel_ids?: string[]
+  creator_id?: string
   history_window?: number
   auto_follow_threads?: boolean
   include_reactions_in_history?: boolean
@@ -63,6 +64,7 @@ export interface TelegramChannelConfig {
   bot_token: string
   dm_enabled?: boolean
   group_ids?: string[]
+  creator_id?: string
   history_window?: number
   auto_follow_threads?: boolean
   include_reactions_in_history?: boolean
