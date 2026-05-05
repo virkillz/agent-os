@@ -12,6 +12,7 @@ import AgentSettings from './pages/AgentSettings.tsx'
 import AgentMemory from './pages/AgentMemory.tsx'
 import AgentTodos from './pages/AgentTodos.tsx'
 import AgentSchedule from './pages/AgentSchedule.tsx'
+import AgentSessions from './pages/AgentSessions.tsx'
 import Settings from './pages/Settings.tsx'
 import SettingsProvider from './pages/settings/Provider.tsx'
 import SettingsExtensions from './pages/settings/Extensions.tsx'
@@ -111,6 +112,7 @@ export default function App() {
             <Route path="/agents/:id/memory" element={<AgentMemory />} />
             <Route path="/agents/:id/todos" element={<AgentTodos />} />
             <Route path="/agents/:id/schedule" element={<AgentSchedule />} />
+            <Route path="/agents/:id/sessions" element={<AgentSessions />} />
             <Route path="/workspace" element={<Workspace />} />
             <Route path="/explorer" element={<Explorer />} />
             <Route path="/notifications" element={<Notifications />} />

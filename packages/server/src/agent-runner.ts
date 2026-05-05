@@ -1,19 +1,39 @@
 import { getModel, type ImageContent } from '@mariozechner/pi-ai'
 import {
   createAgentSession,
-  createCodingTools,
+  createBashTool,
+  createReadTool,
+  createWriteTool,
+  createEditTool,
   AuthStorage,
   ModelRegistry,
   DefaultResourceLoader,
   SessionManager,
+  loadSkillsFromDir,
+  formatSkillsForPrompt,
   type AgentSessionEvent,
 } from '@mariozechner/pi-coding-agent'
 import path from 'path'
+import os from 'os'
 import { fileURLToPath } from 'url'
 
 // Built-in skills directory — skills placed here are available to all agents by default
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const BUILTIN_SKILLS_DIR = path.join(__dirname, 'skills')
+
+// Global user skills directory — manually placed skills shared across all AgentOS workspaces
+export function getGlobalSkillsDir(): string {
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming')
+    return path.join(appData, 'AgentOS', 'skills')
+  }
+  if (process.platform === 'linux') {
+    const xdgDataHome = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), '.local', 'share')
+    return path.join(xdgDataHome, 'agents', 'skills')
+  }
+  // macOS (and any other unix-like)
+  return path.join(os.homedir(), '.agents', 'skills')
+}
 import chalk from 'chalk'
 import {
   getAgentMemory, getAgentTodos, getDb, getSetting,
@@ -49,8 +69,20 @@ export interface ModelConfig {
   thinkingLevel?: string
   tools?: string[]
   disabledTools?: string[]
+  disabledAgentTools?: Array<'bash' | 'read' | 'write' | 'edit'>
   allowedSkills?: string[]
   connectionProfileId?: string
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildCodingTools(workspaceDir: string, disabled: string[]): any[] {
+  const all = [
+    { name: 'bash',  factory: () => createBashTool(workspaceDir) },
+    { name: 'read',  factory: () => createReadTool(workspaceDir) },
+    { name: 'write', factory: () => createWriteTool(workspaceDir) },
+    { name: 'edit',  factory: () => createEditTool(workspaceDir) },
+  ]
+  return all.filter((t) => !disabled.includes(t.name)).map((t) => t.factory())
 }
 
 export interface AgentRecord {
@@ -169,6 +201,26 @@ export function buildSystemPrompt(
     .join('\n\n')
 }
 
+/**
+ * Load skills from all configured directories and return the formatted skills
+ * section string that the SDK appends to the system prompt at runtime.
+ * Returns empty string if no skills are found.
+ */
+export function buildSkillsSection(allowedSkills?: string[]): string {
+  const skillDirs = [BUILTIN_SKILLS_DIR, getGlobalSkillsDir(), path.join(dataDir, 'skills')]
+  let allSkills = skillDirs.flatMap((dir) => {
+    try {
+      return loadSkillsFromDir({ dir, source: dir }).skills
+    } catch {
+      return []
+    }
+  })
+  if (allowedSkills) {
+    allSkills = allSkills.filter((s) => allowedSkills.includes(s.name))
+  }
+  return formatSkillsForPrompt(allSkills)
+}
+
 function resolveModelConfig(modelConfigJson: string, defaultConfig: ModelConfig): ModelConfig {
   try {
     const parsed = JSON.parse(modelConfigJson)
@@ -231,6 +283,7 @@ async function createLiveSession(
   channelSessionId?: string,
   includeTodos = false,
   creatorId?: string,
+  contextConfig?: { system_prompt_append?: string; disabled_agent_tools?: string[]; disabled_platform_tools?: string[] },
 ): Promise<LiveSession> {
   const config = resolveModelConfig(agent.model_config, defaultModel)
 
@@ -321,6 +374,9 @@ async function createLiveSession(
       `Exercise caution with all users and do not share sensitive information unless you are certain of the recipient's identity.`
     )
   }
+  if (contextConfig?.system_prompt_append) {
+    trustPolicySections.push(contextConfig.system_prompt_append)
+  }
 
   if (debugMode) {
     dbg(agent.name, chalk.bold('── NEW SESSION ──'))
@@ -330,9 +386,10 @@ async function createLiveSession(
     ? path.join(dataDir, 'sessions', agent.id, channelSessionId)
     : path.join(dataDir, 'sessions', agent.id)
 
-  // Build platform tools from the agent's declared tool list
-  const toolIds: string[] = config.tools ?? []
-  const disabledTools: string[] = config.disabledTools ?? []
+  // Build platform tools from the agent's declared tool list, merged with context overrides
+  const contextDisabledPlatformTools: string[] = contextConfig?.disabled_platform_tools ?? []
+  const toolIds: string[] = (config.tools ?? []).filter((id) => !contextDisabledPlatformTools.includes(id))
+  const disabledTools: string[] = [...new Set([...(config.disabledTools ?? []), ...contextDisabledPlatformTools])]
   const customTools = [
     ...buildAgentTools(toolIds, { agentId: agent.id, workspaceDir }, disabledTools),
     ...mcp.tools,
@@ -345,8 +402,8 @@ async function createLiveSession(
     systemPromptOverride: () => systemPrompt,
     agentsFilesOverride: () => ({ agentsFiles: [] }),
     appendSystemPromptOverride: () => trustPolicySections,
-    // Inject built-in and user-installed skills
-    additionalSkillPaths: [BUILTIN_SKILLS_DIR, path.join(dataDir, 'skills')],
+    // Inject built-in, global (~/.agents/skills), and workspace-installed skills
+    additionalSkillPaths: [BUILTIN_SKILLS_DIR, getGlobalSkillsDir(), path.join(dataDir, 'skills')],
     ...(allowedSkills && {
       skillsOverride: (base) => ({
         ...base,
@@ -365,6 +422,10 @@ async function createLiveSession(
     dbg(agent.name, chalk.dim('auth: falling back to env var'))
   }
 
+  const agentDisabled: string[] = config.disabledAgentTools ?? []
+  const contextDisabled: string[] = contextConfig?.disabled_agent_tools ?? []
+  const effectiveDisabledAgentTools = [...new Set([...agentDisabled, ...contextDisabled])]
+
   const { session } = await createAgentSession({
     cwd: workspaceDir,
     model,
@@ -372,7 +433,7 @@ async function createLiveSession(
     authStorage,
     modelRegistry: new ModelRegistry(authStorage),
     resourceLoader: loader,
-    tools: createCodingTools(workspaceDir),
+    tools: buildCodingTools(workspaceDir, effectiveDisabledAgentTools),
     customTools,
     sessionManager: SessionManager.create(dataDir, sessionsDir),
   })
@@ -487,6 +548,7 @@ export async function chatWithChannel(
   scopeId?: string,
   attachments?: Attachment[],
   creatorId?: string,
+  contextConfig?: { system_prompt_append?: string; disabled_agent_tools?: string[]; disabled_platform_tools?: string[] },
 ): Promise<AgentResponse> {
   let channelSession = getActiveChannelSession(agent.id, channelKey)
   if (!channelSession) {
@@ -512,7 +574,7 @@ export async function chatWithChannel(
   }
 
   if (!liveSessions.has(liveKey)) {
-    const live = await createLiveSession(agent, effectiveModel, undefined, channelSession.id, false, creatorId)
+    const live = await createLiveSession(agent, effectiveModel, undefined, channelSession.id, false, creatorId, contextConfig)
     liveSessions.set(liveKey, live)
   }
 

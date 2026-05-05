@@ -1,7 +1,9 @@
 import { Router } from 'express'
 import { CronExpressionParser } from 'cron-parser'
 import { getDb, type ScheduleRow } from '../db.js'
-import { buildSystemPrompt, resolveWorkspaceDir, type AgentRecord } from '../agent-runner.js'
+import { buildSystemPrompt, buildSkillsSection, resolveWorkspaceDir, type AgentRecord } from '../agent-runner.js'
+import { getMcpToolsForAgent } from '../mcp-client.js'
+import { enqueueInvocation } from '../queue-worker.js'
 
 function computeNextRun(cron: string): string {
   return CronExpressionParser.parse(cron).next().toDate().toISOString()
@@ -97,7 +99,7 @@ export function createSchedulesRouter(): Router {
   })
 
   // GET /api/agents/:id/schedules/:sid/preview
-  router.get('/:id/schedules/:sid/preview', (req, res) => {
+  router.get('/:id/schedules/:sid/preview', async (req, res) => {
     const db = getDb()
     const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id) as unknown as AgentRecord | undefined
     const row = db
@@ -107,9 +109,36 @@ export function createSchedulesRouter(): Router {
       res.status(404).json({ error: 'Not found' })
       return
     }
-    const systemPrompt = buildSystemPrompt(agent, resolveWorkspaceDir(), true)
+    let systemPrompt = buildSystemPrompt(agent, resolveWorkspaceDir(), true)
+    const mc = (() => { try { return JSON.parse(agent.model_config || '{}') } catch { return {} } })()
+    const skillsSection = buildSkillsSection(mc.allowedSkills)
+    if (skillsSection) systemPrompt += skillsSection
+    const mcp = await getMcpToolsForAgent(agent.id)
+    if (mcp.sections.length > 0) {
+      systemPrompt += '\n\n' + mcp.sections.join('\n\n')
+    }
+    await mcp.cleanup()
     const prompt = `${systemPrompt}\n\n------------------------\nNow your current task is:\n${row.prompt}`
     res.json({ prompt })
+  })
+
+  // POST /api/agents/:id/schedules/:sid/run — run now (via queue, not chat)
+  router.post('/:id/schedules/:sid/run', (req, res) => {
+    const db = getDb()
+    const row = db
+      .prepare('SELECT * FROM agent_schedules WHERE id = ? AND agent_id = ?')
+      .get(req.params.sid, req.params.id) as unknown as ScheduleRow | undefined
+    if (!row) {
+      res.status(404).json({ error: 'Not found' })
+      return
+    }
+    const queueId = enqueueInvocation({
+      agentId: req.params.id,
+      triggerId: null,
+      triggerType: 'scheduler',
+      prompt: row.prompt,
+    })
+    res.json({ ok: true, queueId })
   })
 
   // DELETE /api/agents/:id/schedules/:sid

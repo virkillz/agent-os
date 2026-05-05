@@ -2,6 +2,7 @@
  * Builds the system prompt addendum and conversation history block
  * for Slack-triggered invocations.
  */
+import type { ContextConfig } from '../types.js'
 
 export interface SlackTriggerMeta {
   platform: 'slack'
@@ -13,6 +14,7 @@ export interface SlackTriggerMeta {
   externalMsgId: string    // Slack ts of the inbound message (encoded as "channelId:ts")
   channelName?: string     // human-readable channel name e.g. "marketing"
   creatorId?: string       // Slack user ID of the trusted owner
+  contextConfig?: ContextConfig
 }
 
 export function buildSlackContextAddendum(ctx: SlackTriggerMeta): string {

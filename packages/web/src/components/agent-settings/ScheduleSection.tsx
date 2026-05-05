@@ -97,7 +97,7 @@ export function ScheduleSection({ agentId }: { agentId: string }) {
   async function handleRunNow(s: Schedule) {
     setRunningId(s.id)
     try {
-      await api.chat.send(agentId, s.prompt)
+      await api.schedules.runNow(agentId, s.id)
     } finally {
       setRunningId(null)
     }

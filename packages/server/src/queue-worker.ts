@@ -73,7 +73,7 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
     return
   }
 
-  let payload: { prompt: string; triggerContext?: PlatformTriggerContext; attachments?: Attachment[] }
+  let payload: { prompt: string; triggerContext?: PlatformTriggerContext; webChat?: boolean; attachments?: Attachment[] }
   try {
     payload = JSON.parse(row.payload)
   } catch {
@@ -91,14 +91,29 @@ async function processRow(row: InvocationQueueRow): Promise<void> {
 
   try {
     let response: { text: string; generatedImages: Attachment[] }
-    if (ctx) {
+    if (payload.webChat) {
+      // Web UI chat: persistent 'web:dm:default' channel session, reply delivered via WebSocket
+      response = await chatWithChannel(agent, 'web:dm:default', 'web', payload.prompt, getFallbackModel(), 'dm', 'default', attachments)
+      const attachmentsJson = JSON.stringify(response.generatedImages)
+      const result = db.prepare(
+        'INSERT INTO chat_messages (agent_id, role, content, attachments) VALUES (?, ?, ?, ?)'
+      ).run(row.agent_id, 'assistant', response.text, attachmentsJson) as { lastInsertRowid: number | bigint }
+      eventBus.emit({
+        type: 'chat:message',
+        agentId: row.agent_id,
+        agentName: agent.name,
+        role: 'assistant',
+        content: response.text,
+        messageId: Number(result.lastInsertRowid),
+      })
+    } else if (ctx) {
       // Platform message (Telegram/Slack): use the persistent channel session so the
       // agent has full conversation memory. Prepend a compact header with sender info
       // and message ID (needed for reactions); the session handles history itself.
       const channelKey = buildChannelKey(ctx)
       const header = buildMessageHeader(ctx)
       const message = `${header}\n${payload.prompt}`
-      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId, attachments, ctx.creatorId)
+      response = await chatWithChannel(agent, channelKey, ctx.platform, message, getFallbackModel(), ctx.scopeType, ctx.scopeId, attachments, ctx.creatorId, ctx.contextConfig)
     } else {
       // Scheduled / other non-platform trigger: isolated fresh session (existing behaviour)
       response = await invokeAgent(agent, payload.prompt, getFallbackModel(), { attachments })
@@ -175,12 +190,14 @@ export function enqueueInvocation(opts: {
   triggerType: string
   prompt: string
   triggerContext?: PlatformTriggerContext
+  webChat?: boolean
   attachments?: Attachment[]
 }): number {
   const db = getDb()
   const payload = JSON.stringify({
     prompt: opts.prompt,
     ...(opts.triggerContext ? { triggerContext: opts.triggerContext } : {}),
+    ...(opts.webChat ? { webChat: true } : {}),
     ...(opts.attachments ? { attachments: opts.attachments } : {}),
   })
   const result = db.prepare(

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { loadSkillsFromDir } from '@mariozechner/pi-coding-agent'
 import { getDb, getAgentChannelSessions } from '../db.js'
-import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir, getDataDir, BUILTIN_SKILLS_DIR } from '../agent-runner.js'
+import { clearSession, buildSystemPrompt, resolveWorkspaceDir, resolveSessionsDir, getDataDir, BUILTIN_SKILLS_DIR, getGlobalSkillsDir } from '../agent-runner.js'
 import { getMcpToolsForAgent } from '../mcp-client.js'
 
 export interface AgentRow {
@@ -216,11 +216,15 @@ export function createAgentsRouter(): Router {
       /* ignore parse error */
     }
 
-    const skillDirs = [BUILTIN_SKILLS_DIR, path.join(getDataDir(), 'skills')]
+    const skillDirs = [BUILTIN_SKILLS_DIR, getGlobalSkillsDir(), path.join(getDataDir(), 'skills')]
     for (const dir of skillDirs) {
       if (!fs.existsSync(dir)) continue
       try {
-        const { skills } = loadSkillsFromDir({ dir, source: dir === BUILTIN_SKILLS_DIR ? 'builtin' : 'workspace' })
+        let source: 'builtin' | 'global' | 'workspace'
+        if (dir === BUILTIN_SKILLS_DIR) source = 'builtin'
+        else if (dir === getGlobalSkillsDir()) source = 'global'
+        else source = 'workspace'
+        const { skills } = loadSkillsFromDir({ dir, source })
         const filtered = allowedSkills
           ? skills.filter((s) => allowedSkills!.includes(s.name))
           : skills

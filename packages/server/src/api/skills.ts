@@ -2,6 +2,7 @@ import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
 import { loadSkillsFromDir } from '@mariozechner/pi-coding-agent'
+import { getGlobalSkillsDir } from '../agent-runner.js'
 
 export function createSkillsRouter(dataDir: string): Router {
   const router = Router()
@@ -11,22 +12,43 @@ export function createSkillsRouter(dataDir: string): Router {
     fs.mkdirSync(skillsDir, { recursive: true })
   }
 
-  // GET /api/skills — list installed skills
+  // GET /api/skills — list workspace-installed and global skills
   router.get('/', (_req, res) => {
     ensureSkillsDir()
-    const { skills } = loadSkillsFromDir({ dir: skillsDir, source: 'workspace' })
+    const globalDir = getGlobalSkillsDir()
 
-    const result = skills.map((skill) => {
+    // Workspace skills (installable via GitHub)
+    const { skills: workspaceSkills } = loadSkillsFromDir({ dir: skillsDir, source: 'workspace' })
+    const workspaceResult = workspaceSkills.map((skill) => {
       const metaPath = path.join(path.dirname(skill.filePath), '.source.json')
       let repo: string | null = null
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as { repo?: string }
         repo = meta.repo ?? null
       } catch { /* no meta file */ }
-      return { name: skill.name, description: skill.description, repo }
+      return { name: skill.name, description: skill.description, repo, source: 'workspace' as const }
     })
 
-    res.json(result)
+    // Global skills (manually placed in ~/.agents/skills or OS equivalent)
+    type SkillEntry = { name: string; description: string; repo: string | null; source: 'workspace' | 'global' }
+    let globalResult: SkillEntry[] = []
+    if (fs.existsSync(globalDir)) {
+      try {
+        const { skills: globalSkills } = loadSkillsFromDir({ dir: globalDir, source: 'global' })
+        globalResult = globalSkills.map((skill) => ({
+          name: skill.name,
+          description: skill.description,
+          repo: null,
+          source: 'global' as const,
+        }))
+      } catch { /* ignore unreadable global dir */ }
+    }
+
+    // Workspace skills take priority — deduplicate by name
+    const workspaceNames = new Set(workspaceResult.map((s) => s.name))
+    const dedupedGlobal = globalResult.filter((s) => !workspaceNames.has(s.name))
+
+    res.json([...workspaceResult, ...dedupedGlobal])
   })
 
   // POST /api/skills/install — install from GitHub user/repo

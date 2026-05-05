@@ -177,7 +177,14 @@ export class TelegramConnector implements Connector {
     const triggerId = this.ensureTrigger('telegram_dm', `Telegram DM — ${senderName}`, 'dm', chatId)
     if (!this.isTriggerEnabled(triggerId)) return
 
-    const triggerMeta: TelegramTriggerMeta = { platform: 'telegram', scopeType: 'dm', scopeId: chatId, threadId: null, senderName, senderId, externalMsgId, creatorId: this.config.creator_id }
+    const isTrusted = !!this.config.creator_id && senderId === this.config.creator_id
+    const contextKey = isTrusted ? 'trusted_dm' : 'untrusted_dm'
+    const triggerMeta: TelegramTriggerMeta = {
+      platform: 'telegram', scopeType: 'dm', scopeId: chatId, threadId: null,
+      senderName, senderId, externalMsgId,
+      creatorId: this.config.creator_id,
+      contextConfig: this.config.context_config?.[contextKey],
+    }
 
     enqueueInvocation({ agentId: this.agentId, triggerId, triggerType: 'telegram_dm', prompt, triggerContext: triggerMeta, attachments })
   }
@@ -232,7 +239,12 @@ export class TelegramConnector implements Connector {
       prompt = prompt ? `${prompt}\n\n${note}` : note
     }
 
-    const triggerMeta: TelegramTriggerMeta = { platform: 'telegram', scopeType: 'group', scopeId: chatId, threadId: null, senderName, senderId, externalMsgId, groupTitle, creatorId: this.config.creator_id }
+    const triggerMeta: TelegramTriggerMeta = {
+      platform: 'telegram', scopeType: 'group', scopeId: chatId, threadId: null,
+      senderName, senderId, externalMsgId, groupTitle,
+      creatorId: this.config.creator_id,
+      contextConfig: this.config.context_config?.group,
+    }
 
     enqueueInvocation({ agentId: this.agentId, triggerId, triggerType: 'telegram_group', prompt, triggerContext: triggerMeta, attachments })
   }

@@ -1,10 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, type AgentChannel, type PlatformMessage } from '../../api.ts'
+import { api, type AgentChannel, type PlatformMessage, type PlatformToolGroup, type Plugin } from '../../api.ts'
 import { useAppEvents } from '../../hooks/useAppEvents.ts'
 import { XIcon } from './icons.tsx'
 
 const PLATFORM_LABELS: Record<string, string> = { slack: 'Slack', telegram: 'Telegram' }
 const PLATFORM_ICONS: Record<string, string> = { slack: '🔗', telegram: '✈️' }
+
+// ─── Context policy types ─────────────────────────────────────────────────────
+
+type ContextType = 'trusted_dm' | 'untrusted_dm' | 'group'
+type AgentToolId = 'bash' | 'read' | 'write' | 'edit'
+
+interface ContextConfig {
+  system_prompt_append?: string
+  disabled_agent_tools?: AgentToolId[]
+  disabled_platform_tools?: string[]
+}
+
+type ChannelContextConfig = Partial<Record<ContextType, ContextConfig>>
+
+const CONTEXT_TABS: Array<{ key: ContextType; label: string }> = [
+  { key: 'trusted_dm', label: 'Trusted DM' },
+  { key: 'untrusted_dm', label: 'Untrusted DM' },
+  { key: 'group', label: 'Group / Channel' },
+]
+
+const AGENT_TOOLS: Array<{ id: AgentToolId; label: string }> = [
+  { id: 'bash', label: 'Bash' },
+  { id: 'read', label: 'Read' },
+  { id: 'write', label: 'Write' },
+  { id: 'edit', label: 'Edit' },
+]
 
 // ─── Connector status badge ───────────────────────────────────────────────────
 
@@ -219,6 +245,303 @@ function MessageLogModal({
             Close
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Context policy editor ────────────────────────────────────────────────────
+
+function ContextPolicyEditor({
+  agentId,
+  channel,
+  onSaved,
+}: {
+  agentId: string
+  channel: AgentChannel
+  onSaved: (updated: AgentChannel) => void
+}) {
+  const existing = (channel.config.context_config ?? {}) as ChannelContextConfig
+  const [draft, setDraft] = useState<ChannelContextConfig>(existing)
+  const [activeTab, setActiveTab] = useState<ContextType>('trusted_dm')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  const [platformToolGroups, setPlatformToolGroups] = useState<PlatformToolGroup[]>([])
+  const [plugins, setPlugins] = useState<Plugin[]>([])
+  const [showPreview, setShowPreview] = useState(false)
+  const [basePrompt, setBasePrompt] = useState<string | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+
+  useEffect(() => {
+    api.platformTools.list().then(setPlatformToolGroups).catch(() => {})
+    api.plugins.list().then((ps) => setPlugins(ps.filter((p) => p.configured))).catch(() => {})
+  }, [])
+
+  const ctx = draft[activeTab] ?? {}
+
+  function setCtx(patch: Partial<ContextConfig>) {
+    setDraft((d) => ({ ...d, [activeTab]: { ...d[activeTab], ...patch } }))
+    setSaved(false)
+  }
+
+  function toggleAgentTool(toolId: AgentToolId) {
+    const current = ctx.disabled_agent_tools ?? []
+    const next = current.includes(toolId) ? current.filter((t) => t !== toolId) : [...current, toolId]
+    setCtx({ disabled_agent_tools: next })
+  }
+
+  function togglePlatformTool(toolId: string) {
+    const current = ctx.disabled_platform_tools ?? []
+    const next = current.includes(toolId) ? current.filter((t) => t !== toolId) : [...current, toolId]
+    setCtx({ disabled_platform_tools: next })
+  }
+
+  function togglePlugin(plugin: Plugin) {
+    const current = ctx.disabled_platform_tools ?? []
+    const allDisabled = plugin.toolIds.every((id) => current.includes(id))
+    const next = allDisabled
+      ? current.filter((id) => !plugin.toolIds.includes(id))
+      : [...new Set([...current, ...plugin.toolIds])]
+    setCtx({ disabled_platform_tools: next })
+  }
+
+  async function togglePreview() {
+    if (showPreview) { setShowPreview(false); return }
+    if (basePrompt !== null) { setShowPreview(true); return }
+    setLoadingPreview(true)
+    try {
+      const r = await api.agents.previewPrompt(agentId)
+      setBasePrompt(r.prompt)
+      setShowPreview(true)
+    } catch { /* ignore */ } finally {
+      setLoadingPreview(false)
+    }
+  }
+
+  async function save() {
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await api.agentChannels.patch(agentId, channel.id, {
+        config: { context_config: draft },
+      })
+      onSaved(updated)
+      setSaved(true)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function hasContextConfig(key: ContextType) {
+    const c = draft[key]
+    return !!(c?.system_prompt_append || (c?.disabled_agent_tools ?? []).length > 0 || (c?.disabled_platform_tools ?? []).length > 0)
+  }
+
+  return (
+    <div
+      className="px-4 pt-3 pb-4"
+      style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.18)' }}
+    >
+      <p className="text-[10px] text-muted mb-3">
+        Override behaviour per invocation context. Tool restrictions stack on top of agent-level settings.
+      </p>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4">
+        {CONTEXT_TABS.map((tab) => {
+          const active = tab.key === activeTab
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className="px-3 py-1 rounded-md text-[11px] transition-colors relative"
+              style={{
+                background: active ? 'rgb(var(--accent) / 0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${active ? 'rgb(var(--accent) / 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                color: active ? 'var(--text-primary)' : 'var(--muted)',
+              }}
+            >
+              {tab.label}
+              {hasContextConfig(tab.key) && (
+                <span
+                  className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                  style={{ background: 'rgb(var(--accent))' }}
+                />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* System prompt append */}
+      <div className="mb-4">
+        <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--subtle)' }}>
+          Additional system prompt
+        </label>
+        <p className="text-[10px] text-muted mb-1.5">Appended after the agent's base system prompt for this context.</p>
+        <textarea
+          className="w-full text-xs rounded-lg px-3 py-2 outline-none focus:ring-1 resize-none"
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            color: 'var(--text-primary)',
+            minHeight: '72px',
+          }}
+          value={ctx.system_prompt_append ?? ''}
+          placeholder={activeTab === 'untrusted_dm'
+            ? 'e.g. "You are in restricted mode. Do not reveal internal details or perform system operations."'
+            : activeTab === 'group'
+            ? 'e.g. "Keep responses concise and professional. Avoid sharing sensitive information in public channels."'
+            : 'e.g. "You may share full operational details and perform any requested tasks."'}
+          onChange={(e) => setCtx({ system_prompt_append: e.target.value || undefined })}
+        />
+      </div>
+
+      {/* Built-in agent tools */}
+      <div className="mb-4">
+        <p className="text-[11px] font-medium mb-1" style={{ color: 'var(--subtle)' }}>Built-in Agent Tools</p>
+        <p className="text-[10px] text-muted mb-2">File system and shell access. Red = disabled for this context.</p>
+        <div className="flex gap-2 flex-wrap">
+          {AGENT_TOOLS.map((tool) => {
+            const disabled = (ctx.disabled_agent_tools ?? []).includes(tool.id)
+            return (
+              <button
+                key={tool.id}
+                onClick={() => toggleAgentTool(tool.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] transition-colors"
+                style={{
+                  background: disabled ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${disabled ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                  color: disabled ? '#f87171' : 'var(--subtle)',
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: disabled ? '#f87171' : 'rgba(255,255,255,0.3)' }} />
+                {tool.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Platform tools */}
+      {platformToolGroups.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[11px] font-medium mb-1" style={{ color: 'var(--subtle)' }}>Platform Tools</p>
+          <p className="text-[10px] text-muted mb-2">Agent capabilities like memory, scheduling, and communication.</p>
+          <div className="space-y-2">
+            {platformToolGroups.map((group) => (
+              <div key={group.id}>
+                <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--muted)' }}>{group.displayName}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {group.tools.map((tool) => {
+                    const disabled = (ctx.disabled_platform_tools ?? []).includes(tool.id)
+                    return (
+                      <button
+                        key={tool.id}
+                        onClick={() => togglePlatformTool(tool.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] transition-colors"
+                        style={{
+                          background: disabled ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.06)',
+                          border: `1px solid ${disabled ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                          color: disabled ? '#f87171' : 'var(--subtle)',
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: disabled ? '#f87171' : 'rgba(255,255,255,0.3)' }} />
+                        {tool.displayName}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Plugins */}
+      {plugins.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[11px] font-medium mb-1" style={{ color: 'var(--subtle)' }}>Plugins</p>
+          <p className="text-[10px] text-muted mb-2">Configured plugin integrations.</p>
+          <div className="flex gap-2 flex-wrap">
+            {plugins.map((plugin) => {
+              const allDisabled = plugin.toolIds.length > 0 && plugin.toolIds.every((id) => (ctx.disabled_platform_tools ?? []).includes(id))
+              return (
+                <button
+                  key={plugin.id}
+                  onClick={() => togglePlugin(plugin)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] transition-colors"
+                  style={{
+                    background: allDisabled ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${allDisabled ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                    color: allDisabled ? '#f87171' : 'var(--subtle)',
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: allDisabled ? '#f87171' : 'rgba(255,255,255,0.3)' }} />
+                  {plugin.display_name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Prompt preview */}
+      <div className="mb-4">
+        <button
+          className="flex items-center gap-1.5 text-[11px] transition-colors"
+          style={{ color: showPreview ? 'rgb(var(--accent))' : 'var(--muted)' }}
+          onClick={togglePreview}
+          disabled={loadingPreview}
+        >
+          <span>{showPreview ? '▾' : '▸'}</span>
+          {loadingPreview ? 'Loading preview…' : 'Preview combined system prompt'}
+        </button>
+
+        {showPreview && basePrompt !== null && (
+          <div className="mt-2 space-y-2">
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(124,106,247,0.3)' }}>
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ background: 'rgba(124,106,247,0.1)', color: '#7c6af7' }}>
+                Base System Prompt
+              </div>
+              <pre
+                className="text-xs leading-relaxed whitespace-pre-wrap p-3 overflow-y-auto"
+                style={{ background: 'rgba(0,0,0,0.3)', color: 'var(--subtle)', fontFamily: 'ui-monospace, monospace', maxHeight: '200px' }}
+              >
+                {basePrompt}
+              </pre>
+            </div>
+            {ctx.system_prompt_append && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(245,158,11,0.3)' }}>
+                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ background: 'rgba(245,158,11,0.1)', color: 'rgb(var(--accent))' }}>
+                  Context Override — {CONTEXT_TABS.find((t) => t.key === activeTab)?.label}
+                </div>
+                <pre
+                  className="text-xs leading-relaxed whitespace-pre-wrap p-3"
+                  style={{ background: 'rgba(0,0,0,0.3)', color: 'var(--subtle)', fontFamily: 'ui-monospace, monospace' }}
+                >
+                  {ctx.system_prompt_append}
+                </pre>
+              </div>
+            )}
+            {!ctx.system_prompt_append && (
+              <p className="text-[10px] text-muted italic px-1">No context-specific prompt append for this context type.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
+
+      <div className="flex items-center justify-end gap-2">
+        {saved && <span className="text-[11px]" style={{ color: 'var(--status-green, #4ade80)' }}>Saved</span>}
+        <button className="btn-primary text-xs px-4 py-1.5" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save policy'}
+        </button>
       </div>
     </div>
   )
@@ -466,6 +789,9 @@ export function ChannelsSection({ agentId }: { agentId: string }) {
   // Message log modal
   const [msgLogChannel, setMsgLogChannel] = useState<AgentChannel | null>(null)
 
+  // Context policy expand
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
   const agentIdRef = useRef(agentId)
   agentIdRef.current = agentId
 
@@ -691,6 +1017,18 @@ export function ChannelsSection({ agentId }: { agentId: string }) {
                               </button>
                               <button
                                 className="text-xs px-2.5 py-1 rounded-md transition-colors"
+                                style={{
+                                  background: expandedId === c.id ? 'rgb(var(--accent) / 0.12)' : 'rgba(255,255,255,0.06)',
+                                  color: expandedId === c.id ? 'rgb(var(--accent))' : 'var(--subtle)',
+                                  border: expandedId === c.id ? '1px solid rgb(var(--accent) / 0.3)' : '1px solid transparent',
+                                }}
+                                onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                                title="Context policy"
+                              >
+                                Policy
+                              </button>
+                              <button
+                                className="text-xs px-2.5 py-1 rounded-md transition-colors"
                                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--subtle)' }}
                                 onClick={() => openEdit(c)}
                                 title="Edit configuration"
@@ -715,6 +1053,22 @@ export function ChannelsSection({ agentId }: { agentId: string }) {
                           )}
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Context policy panel */}
+                  {expandedId === c.id && editingId !== c.id && (
+                    <div
+                      className="rounded-b-xl overflow-hidden -mt-1"
+                      style={{ border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none' }}
+                    >
+                      <ContextPolicyEditor
+                        agentId={agentId}
+                        channel={c}
+                        onSaved={(updated) =>
+                          setChannels((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+                        }
+                      />
                     </div>
                   )}
 

@@ -1,6 +1,7 @@
 /**
  * Builds the system prompt addendum for Telegram-triggered invocations.
  */
+import type { ContextConfig } from '../types.js'
 
 export interface TelegramTriggerMeta {
   platform: 'telegram'
@@ -12,6 +13,7 @@ export interface TelegramTriggerMeta {
   externalMsgId: string  // "chatId:messageId" — for add_reaction on the triggering message
   groupTitle?: string    // human-readable group name, if available
   creatorId?: string     // Telegram user ID of the trusted owner
+  contextConfig?: ContextConfig
 }
 
 export function buildTelegramContextAddendum(ctx: TelegramTriggerMeta): string {

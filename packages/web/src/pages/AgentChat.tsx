@@ -12,7 +12,7 @@ import PageHeader from '../components/PageHeader.tsx'
 export default function AgentChat() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { agents, agentStatus } = useStore()
+  const { agents, agentStatus, setAgentStatus } = useStore()
   const agent = agents.find((a) => a.id === id)
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -34,7 +34,20 @@ export default function AgentChat() {
   }, [messages, sending])
 
   useAppEvents((event) => {
-    if (event.type === 'chat:message' && event.agentId === id) {
+    if (!id) return
+    if (event.type === 'agent:thinking' && event.agentId === id) {
+      setAgentStatus(id, 'thinking')
+      setSending(true)
+    } else if (event.type === 'agent:idle' && event.agentId === id) {
+      setAgentStatus(id, 'idle')
+      setSending(false)
+    } else if (event.type === 'agent:error' && event.agentId === id) {
+      setAgentStatus(id, 'error')
+      setSending(false)
+    } else if (event.type === 'invocation:failed' && event.agentId === id && event.triggerType === 'internal_chat') {
+      setError(event.error || 'Agent failed to respond')
+      setSending(false)
+    } else if (event.type === 'chat:message' && event.agentId === id) {
       const msg: ChatMessage = {
         id: event.messageId,
         agent_id: event.agentId,
@@ -43,6 +56,8 @@ export default function AgentChat() {
         created_at: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, msg])
+      setSending(false)
+      setTimeout(() => inputRef.current?.focus(), 50)
     }
   })
 
@@ -74,20 +89,11 @@ export default function AgentChat() {
     setMessages((prev) => [...prev, userMsg])
 
     try {
-      const { reply, generatedImages } = await api.chat.send(id, msg)
-      const assistantMsg: ChatMessage = {
-        id: Date.now() + 1,
-        agent_id: id,
-        role: 'assistant',
-        content: reply,
-        attachments: generatedImages,
-        created_at: new Date().toISOString(),
-      }
-      setMessages((prev) => [...prev, assistantMsg])
+      await api.chat.send(id, msg)
+      // Reply arrives via chat:message WebSocket event — no need to handle response here
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to send')
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
-    } finally {
       setSending(false)
       setTimeout(() => inputRef.current?.focus(), 50)
     }

@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store.ts'
-import { MessageCircle, Brain, CheckSquare, Calendar, Settings, type LucideIcon } from 'lucide-react'
+import { MessageCircle, Brain, CheckSquare, Calendar, Settings, History, type LucideIcon } from 'lucide-react'
 import PageHeader from '../components/PageHeader.tsx'
 import { AgentProfileCard } from '../components/AgentProfileCard.tsx'
 
@@ -51,6 +51,13 @@ export default function AgentProfile() {
       sublabel: 'View schedule',
       onClick: () => navigate(`/agents/${id}/schedule`),
       color: 'rgba(255, 180, 120, 0.8)',
+    },
+    {
+      icon: History,
+      label: 'Sessions',
+      sublabel: 'View session history',
+      onClick: () => navigate(`/agents/${id}/sessions`),
+      color: 'rgba(120, 180, 220, 0.8)',
     },
     {
       icon: Settings,

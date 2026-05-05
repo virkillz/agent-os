@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
-import { chatWithAgent, endAndClearChannelSession, type AgentRecord } from '../agent-runner.js'
+import { endAndClearChannelSession } from '../agent-runner.js'
+import { enqueueInvocation } from '../queue-worker.js'
 import type { AgentRow } from './agents.js'
 
 interface MessageRow {
@@ -10,10 +11,6 @@ interface MessageRow {
   content: string
   attachments: string
   created_at: string
-}
-
-function getFallbackModel() {
-  return { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.5', thinkingLevel: 'low' }
 }
 
 export function createChatRouter(): Router {
@@ -31,8 +28,8 @@ export function createChatRouter(): Router {
     res.json(messages)
   })
 
-  // POST /api/agents/:id/chat — send message
-  router.post('/:id/chat', async (req, res) => {
+  // POST /api/agents/:id/chat — send message (async via queue)
+  router.post('/:id/chat', (req, res) => {
     const agent = getDb()
       .prepare('SELECT * FROM agents WHERE id = ?')
       .get(req.params.id) as AgentRow | undefined
@@ -42,51 +39,30 @@ export function createChatRouter(): Router {
     const { message } = req.body as { message: string }
     if (!message?.trim()) return res.status(400).json({ error: 'message required' })
 
-    // Persist user message to chat_messages (web UI history)
-    getDb()
-      .prepare('INSERT INTO chat_messages (agent_id, role, content) VALUES (?, ?, ?)')
-      .run(agent.id, 'user', message.trim())
+    const db = getDb()
+    const trimmed = message.trim()
 
-    // Also write to platform_messages so web conversations are searchable cross-platform
-    getDb().prepare(`
+    // Persist user message immediately so it appears in history right away
+    db.prepare('INSERT INTO chat_messages (agent_id, role, content) VALUES (?, ?, ?)')
+      .run(agent.id, 'user', trimmed)
+
+    db.prepare(`
       INSERT INTO platform_messages
         (agent_id, platform, message_type, direction, scope_type, scope_id,
          sender_id, sender_name, sender_type, content)
       VALUES (?, 'web', 'message', 'inbound', 'dm', 'default', 'user', 'User', 'user', ?)
-    `).run(agent.id, message.trim())
+    `).run(agent.id, trimmed)
 
-    try {
-      const agentRecord: AgentRecord = {
-        id: agent.id,
-        name: agent.name,
-        role: agent.role,
-        description: agent.description,
-        system_prompt: agent.system_prompt,
-        model_config: agent.model_config,
-        source: agent.source,
-      }
+    // Enqueue — agent runs decoupled from this HTTP request; reply delivered via chat:message WebSocket event
+    const queueId = enqueueInvocation({
+      agentId: agent.id,
+      triggerId: null,
+      triggerType: 'internal_chat',
+      prompt: trimmed,
+      webChat: true,
+    })
 
-      const response = await chatWithAgent(agentRecord, message.trim(), getFallbackModel())
-
-      // Persist assistant reply
-      const attachmentsJson = JSON.stringify(response.generatedImages)
-      getDb()
-        .prepare('INSERT INTO chat_messages (agent_id, role, content, attachments) VALUES (?, ?, ?, ?)')
-        .run(agent.id, 'assistant', response.text, attachmentsJson)
-
-      getDb().prepare(`
-        INSERT INTO platform_messages
-          (agent_id, platform, message_type, direction, scope_type, scope_id,
-           sender_id, sender_name, sender_type, content, attachments)
-        VALUES (?, 'web', 'message', 'outbound', 'dm', 'default', ?, ?, 'agent', ?, ?)
-      `).run(agent.id, agent.id, agent.name, response.text, attachmentsJson)
-
-      res.json({ reply: response.text, generatedImages: response.generatedImages })
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[chat] Error for agent ${agent.name} (${agent.id}):`, err)
-      res.status(500).json({ error: msg })
-    }
+    res.json({ ok: true, queueId })
   })
 
   // DELETE /api/agents/:id/chat — clear history and end the web channel session

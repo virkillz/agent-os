@@ -10,13 +10,12 @@ import { PluginsSection } from '../components/agent-settings/PluginsSection.tsx'
 import { PlatformToolsSection } from '../components/agent-settings/PlatformToolsSection.tsx'
 import { PromptSection } from '../components/agent-settings/PromptSection.tsx'
 import { TerminateSection } from '../components/agent-settings/TerminateSection.tsx'
-import { SessionsSection } from '../components/agent-settings/SessionsSection.tsx'
 import { TriggersSection } from '../components/agent-settings/TriggersSection.tsx'
 import { ChannelsSection } from '../components/agent-settings/ChannelsSection.tsx'
 import { ConnectionSection } from '../components/agent-settings/ConnectionSection.tsx'
 import { McpSection } from '../components/agent-settings/McpSection.tsx'
 
-type Section = 'profile' | 'avatar' | 'connection' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'channels' | 'sessions' | 'terminate'
+type Section = 'profile' | 'avatar' | 'connection' | 'skills' | 'platform-tools' | 'plugins' | 'mcp' | 'prompt' | 'triggers' | 'channels' | 'terminate'
 
 const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'profile', label: 'Profile' },
@@ -29,7 +28,6 @@ const NAV_ITEMS: { id: Section; label: string; danger?: boolean }[] = [
   { id: 'prompt', label: 'System Prompt' },
   { id: 'triggers', label: 'Triggers' },
   { id: 'channels', label: 'Channels' },
-  { id: 'sessions', label: 'Sessions' },
   { id: 'terminate', label: 'Terminate', danger: true },
 ]
 
@@ -207,7 +205,6 @@ export default function AgentSettings() {
         {section === 'prompt' && id && <PromptSection agentId={id} />}
         {section === 'triggers' && id && <TriggersSection agentId={id} />}
         {section === 'channels' && id && <ChannelsSection agentId={id} />}
-        {section === 'sessions' && id && <SessionsSection agentId={id} />}
         {section === 'terminate' && id && <TerminateSection agent={agent} agentId={id} />}
       </div>
       </div>

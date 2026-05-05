@@ -21,6 +21,8 @@ export type AppEvent =
   | { type: 'chat:message'; agentId: string; agentName: string; role: 'assistant'; content: string; messageId: number }
   // ── Notification events ───────────────────────────────────────────────────────
   | { type: 'notification:created'; notification: { id: string; type: string; message: string; source_event: string; meta: string; created_at: string } }
+  // ── Invocation queue events ───────────────────────────────────────────────
+  | { type: 'invocation:failed'; agentId: string; triggerType: string; queueId: number; error: string }
   // ── Connector events ─────────────────────────────────────────────────────────
   | { type: 'connector:started'; agentId: string; platform: string }
   | { type: 'connector:stopped'; agentId: string; platform: string }

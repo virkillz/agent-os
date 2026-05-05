@@ -11,6 +11,10 @@ import { toSlackMarkdown } from './format.js'
 import type { SlackTriggerMeta } from './context.js'
 import { downloadAndProcessImage } from '../image-utils.js'
 
+// @slack/socket-mode bug: state machine throws on 'server explicit disconnect' during 'connecting'.
+// Register once to prevent process crash.
+let _socketErrorHandlerRegistered = false
+
 export class SlackConnector implements Connector {
   readonly platform = 'slack' as const
   readonly agentId: string
@@ -32,6 +36,18 @@ export class SlackConnector implements Connector {
   }
 
   async start(): Promise<void> {
+    if (!_socketErrorHandlerRegistered) {
+      _socketErrorHandlerRegistered = true
+      process.on('uncaughtException', (err) => {
+        if (err instanceof Error && err.message.startsWith("Unhandled event 'server explicit disconnect'")) {
+          console.warn(chalk.yellow('[slack]'), 'socket disconnected by server, will reconnect')
+          return
+        }
+        console.error(err)
+        process.exit(1)
+      })
+    }
+
     // Resolve bot user ID for mention detection
     try {
       const auth = await this.app.client.auth.test({ token: this.config.bot_token })
@@ -160,6 +176,8 @@ export class SlackConnector implements Connector {
     const triggerId = this.ensureTrigger('slack_dm', `Slack DM — ${senderName}`, 'dm', channelId)
     if (!this.isTriggerEnabled(triggerId)) return
 
+    const isTrusted = !!this.config.creator_id && senderId === this.config.creator_id
+    const contextKey = isTrusted ? 'trusted_dm' : 'untrusted_dm'
     const ctx: SlackTriggerMeta = {
       platform: 'slack',
       scopeType: 'dm',
@@ -169,6 +187,7 @@ export class SlackConnector implements Connector {
       senderId,
       externalMsgId,
       creatorId: this.config.creator_id,
+      contextConfig: this.config.context_config?.[contextKey],
     }
 
     enqueueInvocation({
@@ -237,6 +256,7 @@ export class SlackConnector implements Connector {
       externalMsgId,
       channelName,
       creatorId: this.config.creator_id,
+      contextConfig: this.config.context_config?.group,
     }
 
     enqueueInvocation({

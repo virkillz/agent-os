@@ -47,6 +47,20 @@ export interface Attachment {
   data: string // base64-encoded
 }
 
+/** Per-invocation-context behaviour override stored inside channel config */
+export interface ContextConfig {
+  system_prompt_append?: string
+  disabled_agent_tools?: Array<'bash' | 'read' | 'write' | 'edit'>
+  disabled_platform_tools?: string[]  // platform tool IDs + plugin tool IDs to additionally disable
+}
+
+/** All context overrides for a channel, keyed by context type */
+export interface ChannelContextConfig {
+  trusted_dm?: ContextConfig
+  untrusted_dm?: ContextConfig
+  group?: ContextConfig
+}
+
 /** Config shape returned from agent_channels.config for Slack */
 export interface SlackChannelConfig {
   app_token: string
@@ -57,6 +71,7 @@ export interface SlackChannelConfig {
   history_window?: number
   auto_follow_threads?: boolean
   include_reactions_in_history?: boolean
+  context_config?: ChannelContextConfig
 }
 
 /** Config shape returned from agent_channels.config for Telegram */
@@ -68,4 +83,5 @@ export interface TelegramChannelConfig {
   history_window?: number
   auto_follow_threads?: boolean
   include_reactions_in_history?: boolean
+  context_config?: ChannelContextConfig
 }
