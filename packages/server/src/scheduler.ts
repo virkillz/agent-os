@@ -16,16 +16,25 @@ export function buildSchedulerPrompt(schedule: ScheduleRow): string {
 export function startScheduler(): void {
   const db = getDb()
 
-  // Initialize next_run_at for enabled schedules that don't have one yet
-  const uninitialized = db
-    .prepare('SELECT * FROM agent_schedules WHERE enabled = 1 AND next_run_at IS NULL')
-    .all() as unknown as ScheduleRow[]
-  for (const s of uninitialized) {
+  // Initialize next_run_at for enabled schedules that don't have one yet,
+  // and advance any past-due next_run_at to the next future time (skip missed runs)
+  const now = new Date().toISOString()
+  const needsInit = db
+    .prepare('SELECT * FROM agent_schedules WHERE enabled = 1 AND (next_run_at IS NULL OR next_run_at < ?)')
+    .all(now) as unknown as ScheduleRow[]
+  for (const s of needsInit) {
     try {
       db.prepare('UPDATE agent_schedules SET next_run_at = ? WHERE id = ?')
         .run(computeNextRun(s.cron), s.id)
     } catch { /* skip invalid cron */ }
   }
+
+  // Discard stale scheduler queue entries that accumulated while the app was down
+  db.prepare(`
+    UPDATE invocation_queue
+    SET status = 'failed', processed_at = datetime('now')
+    WHERE trigger_type = 'scheduler' AND status = 'pending' AND created_at < ?
+  `).run(now)
 
   setInterval(() => {
     const now = new Date().toISOString()

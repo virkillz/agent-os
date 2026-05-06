@@ -24,14 +24,16 @@ export default function AgentSessions() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-6 py-8 mt-20">
+    <div className="h-full flex flex-col">
+      <div className="flex-shrink-0 max-w-4xl w-full mx-auto px-6 pt-8 pb-4 mt-20">
         <PageHeader
           title="Sessions"
           subtitle={`${agent.name} • View session history`}
           backTo={`/agents/${id}`}
         />
         <AgentProfileCard agentId={id} />
+      </div>
+      <div className="flex-1 min-h-0 max-w-4xl w-full mx-auto px-6 pb-8">
         <SessionsSection agentId={id} />
       </div>
     </div>

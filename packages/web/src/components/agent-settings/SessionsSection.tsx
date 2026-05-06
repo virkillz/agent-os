@@ -206,7 +206,7 @@ export function SessionsSection({ agentId }: { agentId: string }) {
   function loadTree() {
     setTreeLoading(true)
     api.sessions.list(agentId).then(nodes => {
-      const allFiles = flattenFiles(nodes)
+      const allFiles = flattenFiles(nodes).sort((a, b) => b.name.localeCompare(a.name))
       setFiles(allFiles)
       setPage(0)
       if (allFiles.length > 0) setSelected(allFiles[0].path)
@@ -230,7 +230,7 @@ export function SessionsSection({ agentId }: { agentId: string }) {
   const pageFiles = files.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
-    <div className="flex-1 overflow-hidden flex">
+    <div className="h-full overflow-hidden flex">
       {/* Flat file list sidebar */}
       <aside
         className="w-64 flex-shrink-0 flex flex-col"
