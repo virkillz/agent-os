@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type SessionNode, type SessionEvent } from '../../api.ts'
-import { ChevronRightIcon } from './icons.tsx'
+
+const PAGE_SIZE = 20
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -16,7 +17,6 @@ function formatDate(iso: string): string {
 }
 
 function parseSessionLabel(filename: string): string {
-  // "2026-03-21T13-06-49-237Z_uuid.jsonl" → "Mar 21, 13:06"
   const ts = filename.replace(/T(\d{2})-(\d{2})-(\d{2})-\d+Z_.+/, 'T$1:$2:$3Z')
   try {
     return formatDate(ts)
@@ -25,18 +25,13 @@ function parseSessionLabel(filename: string): string {
   }
 }
 
-// ─── Icons ──────────────────────────────────────────────────────────────────
-
-function FolderIcon({ open }: { open: boolean }) {
-  return (
-    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--muted)' }}>
-      {open ? (
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-      ) : (
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-      )}
-    </svg>
-  )
+function flattenFiles(nodes: SessionNode[]): SessionNode[] {
+  const files: SessionNode[] = []
+  for (const n of nodes) {
+    if (n.type === 'file') files.push(n)
+    else if (n.children) files.push(...flattenFiles(n.children))
+  }
+  return files
 }
 
 function FileIcon() {
@@ -174,60 +169,15 @@ function EventRow({ event }: { event: SessionEvent }) {
   )
 }
 
-// ─── Tree node renderer ─────────────────────────────────────────────────────
+// ─── File row ────────────────────────────────────────────────────────────────
 
-function TreeNode({
-  node,
-  depth,
-  expanded,
-  selected,
-  onToggle,
-  onSelect,
-}: {
-  node: SessionNode
-  depth: number
-  expanded: Set<string>
-  selected: string | null
-  onToggle: (path: string) => void
-  onSelect: (path: string) => void
-}) {
-  const isExpanded = expanded.has(node.path)
+function FileRow({ node, selected, onSelect }: { node: SessionNode; selected: string | null; onSelect: (path: string) => void }) {
   const isSelected = selected === node.path
-  const paddingLeft = 12 + depth * 14
-
-  if (node.type === 'dir') {
-    return (
-      <div>
-        <button
-          onClick={() => onToggle(node.path)}
-          className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 transition-colors"
-          style={{ paddingLeft, background: isSelected ? 'rgba(245,158,11,0.08)' : undefined }}
-        >
-          <ChevronRightIcon rotated={isExpanded} />
-          <FolderIcon open={isExpanded} />
-          <span className="text-xs truncate" style={{ color: 'var(--subtle)' }}>{node.label || node.name}</span>
-        </button>
-        {isExpanded && node.children?.map(child => (
-          <TreeNode
-            key={child.path}
-            node={child}
-            depth={depth + 1}
-            expanded={expanded}
-            selected={selected}
-            onToggle={onToggle}
-            onSelect={onSelect}
-          />
-        ))}
-      </div>
-    )
-  }
-
   return (
     <button
       onClick={() => onSelect(node.path)}
-      className="w-full text-left px-2 py-1.5 transition-colors flex items-center gap-1.5"
+      className="w-full text-left px-3 py-1.5 transition-colors flex items-center gap-1.5"
       style={{
-        paddingLeft,
         background: isSelected ? 'rgba(245,158,11,0.08)' : undefined,
         borderLeft: `2px solid ${isSelected ? 'rgb(var(--accent))' : 'transparent'}`,
       }}
@@ -246,41 +196,20 @@ function TreeNode({
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function SessionsSection({ agentId }: { agentId: string }) {
-  const [tree, setTree] = useState<SessionNode[]>([])
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [files, setFiles] = useState<SessionNode[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [events, setEvents] = useState<SessionEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [treeLoading, setTreeLoading] = useState(false)
+  const [page, setPage] = useState(0)
 
   function loadTree() {
     setTreeLoading(true)
     api.sessions.list(agentId).then(nodes => {
-      setTree(nodes)
-      const allDirs = new Set<string>()
-      function collectDirs(nodes: SessionNode[]) {
-        for (const n of nodes) {
-          if (n.type === 'dir') {
-            allDirs.add(n.path)
-            if (n.children) collectDirs(n.children)
-          }
-        }
-      }
-      collectDirs(nodes)
-      setExpanded(allDirs)
-
-      function findFirstFile(nodes: SessionNode[]): string | null {
-        for (const n of nodes) {
-          if (n.type === 'file') return n.path
-          if (n.type === 'dir' && n.children) {
-            const found = findFirstFile(n.children)
-            if (found) return found
-          }
-        }
-        return null
-      }
-      const firstFile = findFirstFile(nodes)
-      if (firstFile) setSelected(firstFile)
+      const allFiles = flattenFiles(nodes)
+      setFiles(allFiles)
+      setPage(0)
+      if (allFiles.length > 0) setSelected(allFiles[0].path)
     }).finally(() => setTreeLoading(false))
   }
 
@@ -297,24 +226,20 @@ export function SessionsSection({ agentId }: { agentId: string }) {
       .finally(() => setLoading(false))
   }, [agentId, selected])
 
-  const toggle = (path: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-  }
+  const totalPages = Math.ceil(files.length / PAGE_SIZE)
+  const pageFiles = files.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
     <div className="flex-1 overflow-hidden flex">
-      {/* File tree sidebar */}
+      {/* Flat file list sidebar */}
       <aside
-        className="w-64 flex-shrink-0 overflow-y-auto py-2"
+        className="w-64 flex-shrink-0 flex flex-col"
         style={{ borderRight: '1px solid rgba(255,255,255,0.07)', background: 'rgb(var(--s1) / 0.6)' }}
       >
-        <div className="px-3 mb-2 flex items-center justify-between">
-          <p className="text-[10px] text-muted uppercase tracking-wider font-semibold">Sessions</p>
+        <div className="px-3 py-2 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-[10px] text-muted uppercase tracking-wider font-semibold">
+            Sessions {files.length > 0 && <span className="text-muted/50">({files.length})</span>}
+          </p>
           <button
             onClick={loadTree}
             disabled={treeLoading}
@@ -327,20 +252,41 @@ export function SessionsSection({ agentId }: { agentId: string }) {
             </svg>
           </button>
         </div>
-        {tree.length === 0 && (
-          <p className="text-xs text-muted/50 text-center py-8 px-3">No sessions yet.</p>
+
+        <div className="flex-1 overflow-y-auto py-1">
+          {files.length === 0 && !treeLoading && (
+            <p className="text-xs text-muted/50 text-center py-8 px-3">No sessions yet.</p>
+          )}
+          {pageFiles.map(node => (
+            <FileRow key={node.path} node={node} selected={selected} onSelect={setSelected} />
+          ))}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="p-1 rounded transition-colors hover:bg-white/5 disabled:opacity-30"
+              style={{ color: 'var(--muted)' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span className="text-[10px] text-muted/60">{page + 1} / {totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="p-1 rounded transition-colors hover:bg-white/5 disabled:opacity-30"
+              style={{ color: 'var(--muted)' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         )}
-        {tree.map(node => (
-          <TreeNode
-            key={node.path}
-            node={node}
-            depth={0}
-            expanded={expanded}
-            selected={selected}
-            onToggle={toggle}
-            onSelect={setSelected}
-          />
-        ))}
       </aside>
 
       {/* Event viewer */}
